@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Team Code Names</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --border: #2e2e2e;
+    --text: #f0f0f0;
+    --muted: #666666;
+    --red: #e83a3a;
+    --red-dim: rgba(232,58,58,.15);
+    --blue: #3a8ce8;
+    --blue-dim: rgba(58,140,232,.15);
+    --neutral: #2e2e2e;
+    --neutral-text: #666666;
+    --assassin: #050505;
+    --green: #3ecf6e;
+    --accent: #e83a3a;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header {
+    width: 100%;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text);
+  }
+  .logo .dot { color: var(--red); }
+  #status-bar {
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: right;
+    line-height: 1.6;
+  }
+  #status-bar .sb-name { color: var(--text); font-weight: 700; display: block; }
+  #status-bar .sb-role { font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; display: block; }
+  #status-bar .sb-role.host { color: #f0c040; }
+  #status-bar .sb-role.spymaster { color: var(--red); }
+  #status-bar .sb-role.operative { color: var(--muted); }
+  #status-bar .sb-role.unassigned { color: var(--muted); }
+
+  .screen { display: none; width: 100%; max-width: 1080px; padding: 24px 16px; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+  /* --- SETUP --- */
+  .setup-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 100%;
+    max-width: 460px;
+  }
+  .setup-box h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .ig { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .ig label { font-size: 0.72rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+  input[type=text], input[type=url], input[type=number] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.95rem;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  input:focus { border-color: var(--text); }
+  .btn {
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 10px 20px;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:hover { opacity: .85; transform: translateY(-1px); }
+  .btn:active { transform: none; }
+  .btn-primary { background: var(--text); color: #111; }
+  .btn-red { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn-blue { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border-color: var(--border); }
+  .btn-sm { padding: 6px 13px; font-size: 0.8rem; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+  .w100 { width: 100%; }
+  .flex-row { display: flex; align-items: center; gap: 8px; }
+  .flex-sb { display: flex; align-items: center; justify-content: space-between; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .text-muted { color: var(--muted); font-size: 0.8rem; }
+  .text-center { text-align: center; }
+
+  /* --- LOBBY --- */
+  .lobby-top {
+    text-align: center;
+    padding: 20px 0 12px;
+    width: 100%;
+  }
+  .lobby-top h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--text);
+  }
+  .lobby-top h1 .dot { color: var(--red); }
+  .room-badge {
+    display: inline-block;
+    margin-top: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .teams-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .team-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .team-card.red { border-top: 3px solid var(--red); }
+  .team-card.blue { border-top: 3px solid var(--blue); }
+  .team-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .team-title.red { color: var(--red); }
+  .team-title.blue { color: var(--blue); }
+  .player-list { display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+  .player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    font-weight: 500;
+  }
+  .player-row .spy-badge {
+    font-size: 0.72rem;
+    background: rgba(255,255,255,.1);
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .player-row .spy-badge.active { background: rgba(255,200,0,.12); color: #f0c040; }
+  .join-btns { display: flex; gap: 6px; margin-top: 12px; }
+
+  .host-settings {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-top: 14px;
+  }
+  .host-settings h3 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .settings-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .settings-info {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 12px;
+  }
+
+  /* --- GAME BOARD --- */
+  #game-screen { padding: 14px; gap: 10px; }
+
+  .game-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .score-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+  }
+  .score-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .score-pill .dot.red { background: var(--red); }
+  .score-pill .dot.blue { background: var(--blue); }
+  .score-pill .num { font-weight: 700; }
+  .score-pill .num.red { color: var(--red); }
+  .score-pill .num.blue { color: var(--blue); }
+
+  .turn-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .turn-pill.red { border-color: var(--red); color: var(--red); }
+  .turn-pill.blue { border-color: var(--blue); color: var(--blue); }
+
+  .timer-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    min-width: 70px;
+    text-align: center;
+  }
+  .timer-pill.urgent { color: var(--red); border-color: var(--red); }
+
+  /* CLUE PANEL */
+  .clue-panel {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .clue-display { font-family: 'IBM Plex Mono', monospace; }
+  .clue-display .clue-word { font-size: 1.5rem; font-weight: 700; letter-spacing: 2px; }
+  .clue-display .clue-num { font-size: 0.85rem; color: var(--muted); }
+  .clue-input-row { display: flex; gap: 8px; align-items: center; }
+  .clue-input-row input[type=text] { width: 160px; font-family: 'IBM Plex Mono', monospace; font-size: 1rem; }
+  .clue-input-row input[type=number] { width: 70px; text-align: center; }
+
+  /* SPY TIMER SETTINGS */
+  .spy-settings {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    width: 100%;
+    display: none;
+  }
+  .spy-settings h4 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .spy-settings .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .spy-settings label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  .spy-settings input[type=number] { width: 70px; }
+
+  /* BOARD GRID */
+  .board-grid {
+    width: 100%;
+    display: grid;
+    gap: 6px;
+  }
+  .card-cell {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 8px;
+    cursor: pointer;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    transition: transform .1s, border-color .15s, background .15s;
+    user-select: none;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .card-cell:hover:not(.revealed):not(.disabled) { border-color: var(--text); transform: translateY(-2px); }
+  .card-cell.spy-view-red { border-color: var(--red); color: var(--red); }
+  .card-cell.spy-view-blue { border-color: var(--blue); color: var(--blue); }
+  .card-cell.spy-view-assassin { border-color: #666; color: #555; background: #111; }
+  .card-cell.spy-view-neutral { color: var(--muted); }
+  .card-cell.revealed { cursor: default; transform: none; }
+  .card-cell.revealed.red { background: var(--red); border-color: var(--red); color: #fff; }
+  .card-cell.revealed.blue { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .card-cell.revealed.neutral { background: var(--neutral); border-color: var(--neutral); color: var(--neutral-text); }
+  .card-cell.revealed.assassin { background: #111; border-color: #333; color: #444; }
+  .card-cell.disabled { pointer-events: none; }
+
+  /* LOG & CONTROLS */
+  .game-footer {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .log-panel .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .log-list { display: flex; flex-direction: column; gap: 5px; max-height: 140px; overflow-y: auto; }
+  .log-item { font-size: 0.8rem; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .log-item em { font-style: normal; font-weight: 600; }
+  .log-item.red em { color: var(--red); }
+  .log-item.blue em { color: var(--blue); }
+
+  .ctrl-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ctrl-panel .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* RESULT OVERLAY */
+  .result-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.92);
+    z-index: 100;
+    align-items: flex-start;
+    justify-content: center;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 24px 16px;
+  }
+  .result-overlay.show { display: flex; }
+  .result-inner {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .result-banner {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 32px 36px;
+    text-align: center;
+    border: 2px solid var(--border);
+  }
+  .result-banner.winner-red { border-color: var(--red); }
+  .result-banner.winner-blue { border-color: var(--blue); }
+  .result-banner.draw { border-color: #888; }
+  .result-icon { font-size: 4.5rem; margin-bottom: 10px; line-height: 1; }
+  .result-banner h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+  }
+  .result-banner h2.red { color: var(--red); }
+  .result-banner h2.blue { color: var(--blue); }
+  .result-banner h2.draw { color: #ccc; }
+  .result-banner .result-reason { color: var(--muted); font-size: 0.9rem; margin-bottom: 0; }
+  .result-teams {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .result-team-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    text-align: center;
+  }
+  .result-team-card.win { border-width: 2px; }
+  .result-team-card.win.red { border-color: var(--red); }
+  .result-team-card.win.blue { border-color: var(--blue); }
+  .result-team-card .team-result-icon { font-size: 2.8rem; margin-bottom: 6px; }
+  .result-team-card .team-result-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .result-team-card .team-result-label.red { color: var(--red); }
+  .result-team-card .team-result-label.blue { color: var(--blue); }
+  .result-team-card .team-result-label.lose { color: var(--muted); }
+  .result-player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .result-player {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .result-player .role-tag {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-weight: 400;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .result-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  @media(max-width:600px) {
+    .result-teams { grid-template-columns: 1fr; }
+    .result-banner h2 { font-size: 1.5rem; }
+  }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 11px 22px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    transition: transform .3s;
+    z-index: 200;
+    pointer-events: none;
+    color: var(--text);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media(max-width:700px) {
+    .teams-grid { grid-template-columns: 1fr; }
+    .settings-row { grid-template-columns: 1fr 1fr; }
+    .game-footer { grid-template-columns: 1fr; }
+  }
+  .reset-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.85); z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .reset-overlay.show { display: flex; }
+  .reset-box {
+    background: var(--surface); border: 1px solid var(--red);
+    border-radius: var(--radius); padding: 32px 36px;
+    text-align: center; max-width: 380px; width: 90%;
+  }
+  .reset-box h3 { font-family: 'IBM Plex Mono',monospace; font-size: 1.4rem; letter-spacing: 2px; color: var(--red); margin-bottom: 10px; }
+  .reset-box p { font-size: 0.85rem; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+  .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn-danger:hover { opacity: .85; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" style="display:flex;align-items:center;gap:10px">
+    <!-- Spy silhouette icon (small) -->
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Hat -->
+      <ellipse cx="14" cy="8" rx="8" ry="2.5" fill="#e83a3a"/>
+      <rect x="10" y="4" width="8" height="5" rx="1" fill="#e83a3a"/>
+      <!-- Head -->
+      <circle cx="14" cy="12" r="4" fill="#f0f0f0"/>
+      <!-- Body/coat -->
+      <path d="M7 28 Q7 20 14 19 Q21 20 21 28Z" fill="#1e1e1e" stroke="#e83a3a" stroke-width="1"/>
+      <!-- Collar -->
+      <path d="M11 19 L14 23 L17 19" fill="none" stroke="#e83a3a" stroke-width="1.2"/>
+      <!-- Magnifying glass -->
+      <circle cx="22" cy="18" r="4" fill="none" stroke="#e83a3a" stroke-width="1.5"/>
+      <line x1="25" y1="21" x2="27" y2="23" stroke="#e83a3a" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    DB TEAM <span class="dot"> </span>CODE NAMES
+  </div>
+  <div id="status-bar">
+    <span class="sb-name" id="sb-name">Not connected</span>
+    <span class="sb-role unassigned" id="sb-role">—</span>
+  </div>
+</header>
+
+<!-- SETUP -->
+<div id="setup-screen" class="screen active">
+  <div style="text-align:center;margin-bottom:20px">
+    <!-- Large spy + magnifying glass icon -->
+    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Shadow/glow -->
+      <ellipse cx="55" cy="110" rx="35" ry="6" fill="#e83a3a" opacity="0.12"/>
+      <!-- Trench coat body -->
+      <path d="M22 120 Q22 82 42 76 Q55 72 55 72 Q55 72 68 76 Q88 82 88 120Z" fill="#1e1e1e" stroke="#2e2e2e" stroke-width="1.5"/>
+      <!-- Coat collar / lapels -->
+      <path d="M42 76 L55 92 L68 76" fill="none" stroke="#e83a3a" stroke-width="2.5"/>
+      <!-- Coat belt -->
+      <rect x="38" y="96" width="34" height="4" rx="2" fill="#2e2e2e" stroke="#e83a3a" stroke-width="1"/>
+      <!-- Buttons -->
+      <circle cx="55" cy="102" r="2" fill="#e83a3a"/>
+      <circle cx="55" cy="110" r="2" fill="#e83a3a"/>
+      <!-- Neck -->
+      <rect x="50" y="62" width="10" height="12" rx="3" fill="#f0f0f0"/>
+      <!-- Head -->
+      <circle cx="55" cy="52" r="18" fill="#f0f0f0"/>
+      <!-- Hat brim -->
+      <ellipse cx="55" cy="36" rx="22" ry="5" fill="#141414" stroke="#e83a3a" stroke-width="1.5"/>
+      <!-- Hat top -->
+      <rect x="40" y="18" width="30" height="20" rx="4" fill="#141414" stroke="#e83a3a" stroke-width="1.5"/>
+      <!-- Hat band -->
+      <rect x="40" y="32" width="30" height="4" fill="#e83a3a"/>
+      <!-- Eyes (suspicious squint) -->
+      <ellipse cx="48" cy="52" rx="4" ry="2.5" fill="#141414"/>
+      <ellipse cx="62" cy="52" rx="4" ry="2.5" fill="#141414"/>
+      <circle cx="49" cy="52" r="1.5" fill="#f0f0f0"/>
+      <circle cx="63" cy="52" r="1.5" fill="#f0f0f0"/>
+      <!-- Mouth (slight smirk) -->
+      <path d="M50 60 Q55 64 60 60" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Magnifying glass (held to side) -->
+      <circle cx="95" cy="72" r="16" fill="none" stroke="#e83a3a" stroke-width="3"/>
+      <circle cx="95" cy="72" r="11" fill="#1a1a1a" stroke="#2e2e2e" stroke-width="1"/>
+      <!-- Glass reflection -->
+      <line x1="90" y1="67" x2="93" y2="64" stroke="#f0f0f0" stroke-width="1.5" opacity="0.4" stroke-linecap="round"/>
+      <!-- Handle -->
+      <line x1="106" y1="83" x2="116" y2="95" stroke="#e83a3a" stroke-width="4" stroke-linecap="round"/>
+      <!-- Arm holding glass -->
+      <path d="M72 82 Q80 70 90 68" fill="none" stroke="#1e1e1e" stroke-width="6" stroke-linecap="round"/>
+      <path d="M72 82 Q80 70 90 68" fill="none" stroke="#2e2e2e" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+    <h1 style="font-family:'IBM Plex Mono',monospace;font-size:1.8rem;font-weight:700;letter-spacing:2px;color:#f0f0f0;margin-top:14px;line-height:1.3">Welcome to<br><span style="color:#e83a3a">DB Team Code Names!!!</span></h1>
+    <p style="color:#666;font-size:0.85rem;margin-top:8px">Enter your name to join</p>
+  </div>
+  <div class="setup-box">
+    <div class="ig">
+      <label>Your Name</label>
+      <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
+    </div>
+    <button class="btn btn-primary w100" style="margin-top:10px" onclick="joinRoom()">Join →</button>
+    <p class="text-muted mt8">After joining, pick your team in the lobby.</p>
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+    <button class="btn btn-secondary w100" onclick="showResetDialog()" style="opacity:.7;font-size:0.85rem">🔄 Reset Previous Game</button>
+    <p class="text-muted mt8" style="font-size:0.75rem">Use this if the page is stuck on a previous game state.</p>
+  </div>
+  <!-- Baked-in config -->
+  <input type="hidden" id="fb-url" value="https://code-names-2f52d-default-rtdb.firebaseio.com/">
+  <input type="hidden" id="room-name" value="codenames-room">
+</div>
+
+<!-- LOBBY -->
+<div id="lobby-screen" class="screen">
+  <div class="lobby-top" style="text-align:center">
+    <!-- Spy icon small version for lobby -->
+    <svg width="56" height="56" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:8px">
+      <path d="M22 120 Q22 82 42 76 Q55 72 55 72 Q55 72 68 76 Q88 82 88 120Z" fill="#1e1e1e" stroke="#2e2e2e" stroke-width="1.5"/>
+      <path d="M42 76 L55 92 L68 76" fill="none" stroke="#e83a3a" stroke-width="2.5"/>
+      <rect x="38" y="96" width="34" height="4" rx="2" fill="#2e2e2e" stroke="#e83a3a" stroke-width="1"/>
+      <circle cx="55" cy="102" r="2" fill="#e83a3a"/>
+      <rect x="50" y="62" width="10" height="12" rx="3" fill="#f0f0f0"/>
+      <circle cx="55" cy="52" r="18" fill="#f0f0f0"/>
+      <ellipse cx="55" cy="36" rx="22" ry="5" fill="#141414" stroke="#e83a3a" stroke-width="1.5"/>
+      <rect x="40" y="18" width="30" height="20" rx="4" fill="#141414" stroke="#e83a3a" stroke-width="1.5"/>
+      <rect x="40" y="32" width="30" height="4" fill="#e83a3a"/>
+      <ellipse cx="48" cy="52" rx="4" ry="2.5" fill="#141414"/>
+      <ellipse cx="62" cy="52" rx="4" ry="2.5" fill="#141414"/>
+      <circle cx="49" cy="52" r="1.5" fill="#f0f0f0"/>
+      <circle cx="63" cy="52" r="1.5" fill="#f0f0f0"/>
+      <path d="M50 60 Q55 64 60 60" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="95" cy="72" r="16" fill="none" stroke="#e83a3a" stroke-width="3"/>
+      <circle cx="95" cy="72" r="11" fill="#1a1a1a" stroke="#2e2e2e" stroke-width="1"/>
+      <line x1="106" y1="83" x2="116" y2="95" stroke="#e83a3a" stroke-width="4" stroke-linecap="round"/>
+      <path d="M72 82 Q80 70 90 68" fill="none" stroke="#2e2e2e" stroke-width="5" stroke-linecap="round"/>
+    </svg>
+    <h1>DB TEAM <span class="dot">CODE NAMES</span></h1>
+    <div class="room-badge" id="room-label">room: —</div>
+  </div>
+
+  <div class="teams-grid w100">
+    <div class="team-card red">
+      <div class="team-title red">🔴 Red Team</div>
+      <div class="player-list" id="red-list"></div>
+      <div class="join-btns" id="red-btns">
+        <button class="btn btn-red btn-sm" onclick="joinTeam('red')">Join Red</button>
+        <button class="btn btn-secondary btn-sm" id="red-spy-btn" onclick="becomeSpy('red')" style="display:none">🕵️ Be Spy</button>
+      </div>
+    </div>
+    <div class="team-card blue">
+      <div class="team-title blue">🔵 Blue Team</div>
+      <div class="player-list" id="blue-list"></div>
+      <div class="join-btns" id="blue-btns">
+        <button class="btn btn-blue btn-sm" onclick="joinTeam('blue')">Join Blue</button>
+        <button class="btn btn-secondary btn-sm" id="blue-spy-btn" onclick="becomeSpy('blue')" style="display:none">🕵️ Be Spy</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="host-settings w100" id="host-settings" style="display:none">
+    <h3>// Host Settings</h3>
+    <div class="settings-row">
+      <div class="ig">
+        <label>Words per team</label>
+        <input type="number" id="s-words" min="4" max="12" value="8" onchange="updateSettingsInfo()">
+      </div>
+      <div class="ig">
+        <label>Max turns each team</label>
+        <input type="number" id="s-max-turns" min="1" max="20" value="6" title="How many turns each team gets before the game ends on points">
+      </div>
+      <div class="ig">
+        <label>Max guesses per turn</label>
+        <input type="number" id="s-max-guesses" min="1" max="10" value="3" title="Maximum guesses an operative team can make each turn (regardless of clue number)">
+      </div>
+      <div class="ig">
+        <label>Clue timer (sec)</label>
+        <input type="number" id="s-clue-time" min="30" max="180" value="90">
+      </div>
+      <div class="ig">
+        <label>Guess timer (sec)</label>
+        <input type="number" id="s-guess-time" min="15" max="120" value="60">
+      </div>
+    </div>
+    <div class="settings-info" id="settings-info">Red: 8 · Blue: 8 · 8 neutral · 1 assassin · 25 total</div>
+    <div class="settings-info" id="turn-info" style="margin-top:4px;color:var(--muted);font-size:0.76rem">Each team gets 6 turns · max 3 guesses per turn · game ends when turns run out or all words found</div>
+    <button class="btn btn-primary" id="start-btn" onclick="startGame()" disabled>Start Game</button>
+    <p class="text-muted mt8" id="start-warning" style="color:#e83a3a;display:none">Both teams need a Spymaster before starting</p>
+  </div>
+  <p class="text-muted text-center mt8" id="lobby-wait-msg" style="display:none">Waiting for host to start…</p>
+  <div style="margin-top:12px;text-align:center">
+    <button class="btn btn-secondary" id="claim-host-btn" onclick="claimHost()" style="display:none">👑 Become Host</button>
+    <p class="text-muted mt8" id="host-claimed-msg" style="display:none">You are the host — configure settings above.</p>
+    <button class="btn btn-secondary" id="lobby-reset-btn" onclick="showResetDialog()" style="display:none;margin-top:10px;opacity:.7;font-size:0.82rem">🔄 Reset Game</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div class="game-header w100">
+    <div class="score-pill">
+      <span class="dot red"></span>
+      <span class="num red" id="red-remaining">8</span>
+      <span style="color:var(--muted)">left</span>
+    </div>
+    <div class="score-pill">
+      <span class="dot blue"></span>
+      <span class="num blue" id="blue-remaining">8</span>
+      <span style="color:var(--muted)">left</span>
+    </div>
+    <div class="turn-pill" id="turn-pill">Red's Turn</div>
+    <div class="score-pill" id="turns-remaining-pill" style="font-size:0.78rem">
+      <span style="color:var(--muted)">turns</span>
+      <span id="red-turns-left" style="color:var(--red);font-weight:700">6</span>
+      <span style="color:var(--muted)">/</span>
+      <span id="blue-turns-left" style="color:var(--blue);font-weight:700">6</span>
+    </div>
+    <div class="timer-pill" id="timer-pill">—</div>
+    <div style="flex:1"></div>
+    <button class="btn btn-secondary btn-sm" onclick="endTurn()" id="end-turn-btn" style="display:none">End Turn</button>
+  </div>
+
+  <!-- Spy timer settings (only visible to active spymaster before giving clue) -->
+  <div class="spy-settings w100" id="spy-settings">
+    <h4>Your Clue Timer</h4>
+    <div class="row">
+      <label>Your clue time (sec):</label>
+      <input type="number" id="my-clue-time" min="15" max="180" value="90">
+      <span style="font-size:0.75rem;color:var(--muted)">(Guess timer is set by the host)</span>
+    </div>
+  </div>
+
+  <!-- Clue panel -->
+  <div class="clue-panel w100" id="clue-panel">
+    <div class="clue-display" id="clue-display">
+      <div class="clue-word" id="clue-word">Waiting for clue…</div>
+      <div class="clue-num" id="clue-num"></div>
+    </div>
+    <div class="clue-input-row" id="clue-input-row" style="display:none">
+      <input type="text" id="clue-text-input" placeholder="One word…" maxlength="30" autocomplete="off">
+      <input type="number" id="clue-num-input" min="0" max="9" value="2" style="width:70px">
+      <button class="btn btn-primary btn-sm" onclick="giveClue()">Give Clue</button>
+    </div>
+  </div>
+
+  <!-- Board -->
+  <div class="board-grid w100" id="board-grid"></div>
+
+  <!-- Footer -->
+  <div class="game-footer w100">
+    <div class="log-panel">
+      <div class="panel-title">Game Log</div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+    <div class="ctrl-panel">
+      <div class="panel-title">Players</div>
+      <div id="game-player-list" style="display:flex;flex-direction:column;gap:5px;font-size:0.82rem;max-height:140px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT OVERLAY -->
+<div class="result-overlay" id="result-overlay">
+  <div class="result-inner">
+    <!-- Banner -->
+    <div class="result-banner" id="result-banner">
+      <div class="result-icon" id="result-icon">🏆</div>
+      <h2 id="result-heading" class="red">RED WINS!</h2>
+      <p class="result-reason" id="result-reason">All red words found!</p>
+    </div>
+    <!-- Team cards -->
+    <div class="result-teams" id="result-teams"></div>
+    <!-- Actions -->
+    <div class="result-actions">
+      <button class="btn btn-primary" onclick="playAgain()">Play Again</button>
+      <button class="btn btn-secondary" onclick="closeOverlay()">See Board</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Reset Confirm Overlay -->
+<div class="reset-overlay" id="reset-overlay">
+  <div class="reset-box">
+    <h3>⚠️ Reset Game?</h3>
+    <p>This will clear all players, scores and game state — returning everything to a fresh lobby.<br><br>Everyone currently in the game will be disconnected.</p>
+    <div class="flex-row" style="justify-content:center;gap:10px">
+      <button class="btn btn-danger" onclick="confirmReset()">Yes, Reset</button>
+      <button class="btn btn-secondary" onclick="closeResetDialog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+let db, roomRef, roomPath, myId, myName, myTeam = null, isHost = false, isSpymaster = false;
+let timerInterval, gameState = {};
+let wordsPerTeam = 8;
+
+const WORD_BANK = [
+  'AGENT','AIR','ALIEN','ALPS','AMAZON','AMBULANCE','ANGEL','ANTARCTICA','APPLE','ARM',
+  'BACK','BAND','BANK','BAR','BARK','BASE','BATTERY','BEAR','BEAT','BED',
+  'BELL','BELT','BERLIN','BILL','BIRD','BLOCK','BOARD','BOMB','BOND','BOOK',
+  'BOOT','BOTTLE','BOW','BOX','BRANCH','BRIDGE','BRUSH','BUCK','BUG','BURN',
+  'CABINET','CALF','CALL','CAMP','CAP','CAPITAL','CAR','CARD','CARROT','CAST',
+  'CAT','CELL','CHANGE','CHARGE','CHEST','CHOCOLATE','CIRCLE','CLASS','CLIFF','CLOAK',
+  'CLUB','CODE','COLD','COLUMN','COMPOUND','CONCERT','COUCH','COVER','CRANE','CRASH',
+  'CRICKET','CROSS','CROWN','CRUNCH','CUP','CURRENT','CYCLE','DANCE','DATE','DECK',
+  'DESERT','DIAMOND','DICE','DIGIT','DIP','DOG','DRAFT','DRAGON','DRIFT','DRILL',
+  'DRIVE','DROP','DRUM','DUST','EAGLE','EAR','EARTH','EGG','ELASTIC','EMBASSY',
+  'ENGINE','FACE','FALL','FENCE','FIELD','FIG','FILM','FIRE','FISH','FLAG',
+  'FLAT','FLIGHT','FLOOR','FLY','FOOT','FORCE','FORK','FRENCH','FRONT','FROST',
+  'GAME','GATE','GHOST','GIANT','GLASS','GLOVE','GOLD','GRACE','GRAIN','GRAPE',
+  'GRASS','GROUND','GUIDE','GUN','HAMMER','HAND','HEAD','HEART','HEEL','HIVE',
+  'HOOK','HORN','HORSE','HOTEL','ICE','INDIA','IRON','IVORY','JAM','JAY',
+  'JELLY','JUMP','KEY','KICK','KIMONO','KING','KNEE','KNIFE','KNIGHT','KNOT',
+  'LAB','LADDER','LAKE','LASER','LEAD','LEAF','LEMON','LIGHT','LIME','LINK',
+  'LION','LOCK','LOG','LOOP','LUNGE','MAIL','MAPLE','MARCH','MARK','MASK',
+  'MATCH','MIRROR','MOLE','MOON','NEEDLE','NET','NIGHT','NOTE','NUT','OAK',
+  'OCEAN','OLIVE','ORBIT','OWL','PALM','PAN','PAPER','PARK','PARROT','PASS',
+  'PASTE','PENGUIN','PHOENIX','PIANO','PILOT','PIN','PITCH','PLANE','PLANT','PLATE',
+  'PLAY','PLUM','POINT','POOL','PORT','PRESS','PRIME','PUMPKIN','QUEEN','RADAR',
+  'RAIN','RANGE','RAY','RELAY','RING','RISE','ROAD','ROCK','ROOT','ROPE',
+  'ROSE','ROUND','RULER','RUN','RUST','SAGE','SAIL','SAND','SCALE','SCHOOL',
+  'SCOUT','SEAL','SHADOW','SHAFT','SHARK','SHELL','SHIP','SHOE','SHOP','SHOT',
+  'SIGNAL','SILK','SILVER','SKY','SLIDE','SLIP','SMOKE','SNOW','SOIL','SOLE',
+  'SPACE','SPARK','SPIDER','SPIKE','SPOT','SPRING','STAFF','STAR','STEM','STEP',
+  'STICK','STOCK','STONE','STORM','STREAM','STRIKE','STRING','STRIP','STRUT','SWITCH',
+  'TABLE','TAIL','TANK','TAP','TARGET','THATCH','THREAD','THUMB','TICK','TIDE',
+  'TOMB','TONGUE','TORCH','TOWER','TRACK','TRAP','TREE','TRIP','TRUNK','TUBE',
+  'TUNNEL','TWIST','UNICORN','VENOM','VINE','WALL','WATCH','WAVE','WEB','WHALE',
+  'WHEEL','WIND','WING','WIRE','WOLF','WOOD','YARD','ZERO','ZINC','ZONE',
+];
+
+function buildBoard(perTeam) {
+  const shuffled = [...WORD_BANK].sort(() => Math.random() - .5).slice(0, 25);
+  const key = {};
+  shuffled.slice(0, perTeam).forEach(w => key[w] = 'red');
+  shuffled.slice(perTeam, perTeam * 2).forEach(w => key[w] = 'blue');
+  key[shuffled[perTeam * 2]] = 'assassin';
+  shuffled.slice(perTeam * 2 + 1).forEach(w => { if (!key[w]) key[w] = 'neutral'; });
+  return { words: shuffled, key };
+}
+
+// Settings info updater
+document.getElementById('s-words').addEventListener('input', updateSettingsInfo);
+document.addEventListener('DOMContentLoaded', () => { ['s-max-turns','s-max-guesses'].forEach(id => { const el = document.getElementById(id); if(el) el.addEventListener('input', updateSettingsInfo); }); });
+function updateSettingsInfo() {
+  const n = parseInt(document.getElementById('s-words').value) || 8;
+  const neutral = 25 - n * 2 - 1;
+  document.getElementById('settings-info').textContent =
+    `Red: ${n} · Blue: ${n} · ${neutral} neutral · 1 assassin · 25 total`;
+  const maxTurns = parseInt(document.getElementById('s-max-turns')?.value) || 6;
+  const maxGuesses = parseInt(document.getElementById('s-max-guesses')?.value) || 3;
+  const turnInfoEl = document.getElementById('turn-info');
+  if (turnInfoEl) turnInfoEl.textContent =
+    `Each team gets ${maxTurns} turn${maxTurns!==1?'s':''} · max ${maxGuesses} guess${maxGuesses!==1?'es':''} per turn · game ends when turns run out or all words found`;
+  document.getElementById('start-btn').disabled = checkStartDisabled();
+}
+updateSettingsInfo();
+
+function checkStartDisabled() {
+  const gs = gameState;
+  const red = gs.players ? Object.values(gs.players).filter(p => p.team === 'red' && p.isSpy) : [];
+  const blue = gs.players ? Object.values(gs.players).filter(p => p.team === 'blue' && p.isSpy) : [];
+  return red.length === 0 || blue.length === 0;
+}
+
+window.joinRoom = async function() {
+  const fbUrl = document.getElementById('fb-url').value.trim();
+  const room = document.getElementById('room-name').value.trim();
+  const name = document.getElementById('player-name').value.trim();
+  if (!fbUrl || !room || !name) { showToast('Fill all fields'); return; }
+  try {
+    const app = initializeApp({ databaseURL: fbUrl }, 'cn-' + Date.now());
+    db = getDatabase(app);
+    roomPath = 'codenames/' + room;
+    roomRef = ref(db, roomPath);
+    myName = name;
+    myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    await update(ref(db, `${roomPath}/players/${myId}`), { name, joinedAt: Date.now(), team: null, isSpy: false });
+    const snap = await get(roomRef);
+    const data = snap.val();
+    if (!data?.state) await update(roomRef, { state: 'lobby' });
+    isHost = false;
+    document.getElementById('host-settings').style.display = 'none';
+    document.getElementById('lobby-wait-msg').style.display = '';
+    document.getElementById('claim-host-btn').style.display = '';
+    document.getElementById('sb-name').textContent = name;
+    document.getElementById('sb-role').textContent = 'No team yet';
+    document.getElementById('sb-role').className = 'sb-role unassigned';
+    document.getElementById('room-label').textContent = `room: ${room}`;
+    showScreen('lobby');
+    subscribeRoom();
+  } catch(e) { showToast('Error: ' + e.message); }
+};
+
+window.claimHost = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data?.hostId && data.hostId !== myId) { showToast('Someone is already the host'); return; }
+  await update(roomRef, { hostId: myId });
+  becomeHost();
+};
+
+function becomeHost() {
+  isHost = true;
+  document.getElementById('host-settings').style.display = '';
+  document.getElementById('lobby-wait-msg').style.display = 'none';
+  document.getElementById('claim-host-btn').style.display = 'none';
+  document.getElementById('host-claimed-msg').style.display = '';
+  document.getElementById('lobby-reset-btn').style.display = '';
+  updateStatusBar();
+}
+
+function subscribeRoom() {
+  onValue(roomRef, snap => {
+    const data = snap.val();
+    if (!data) return;
+    gameState = data;
+    // Auto-activate host UI if Firebase confirms we're host
+    if (data.hostId === myId && !isHost) becomeHost();
+    // Update claim button for non-hosts
+    const claimBtn = document.getElementById('claim-host-btn');
+    if (claimBtn && !isHost) {
+      const takenByOther = data.hostId && data.hostId !== myId;
+      claimBtn.textContent = takenByOther ? '👑 Host Taken' : '👑 Become Host';
+      claimBtn.disabled = takenByOther;
+    }
+    if (data.state === 'lobby') renderLobby(data);
+    if (data.state === 'game') renderGame(data);
+    if (data.state === 'result') showResult(data);
+    // Update my role flags
+    const me = data.players?.[myId];
+    if (me) { myTeam = me.team; isSpymaster = me.isSpy || false; }
+    updateStatusBar();
+  });
+}
+
+function updateStatusBar() {
+  const nameEl = document.getElementById('sb-name');
+  const roleEl = document.getElementById('sb-role');
+  if (!myName) return;
+  if (nameEl) nameEl.textContent = myName;
+  if (!roleEl) return;
+  if (isHost && isSpymaster) {
+    roleEl.textContent = 'Host · Spymaster';
+    roleEl.className = 'sb-role spymaster';
+  } else if (isHost) {
+    roleEl.textContent = 'Host';
+    roleEl.className = 'sb-role host';
+  } else if (isSpymaster) {
+    roleEl.textContent = 'Spymaster';
+    roleEl.className = 'sb-role spymaster';
+  } else if (myTeam) {
+    roleEl.textContent = `Operative · ${myTeam.charAt(0).toUpperCase() + myTeam.slice(1)}`;
+    roleEl.className = 'sb-role operative';
+  } else {
+    roleEl.textContent = 'No team yet';
+    roleEl.className = 'sb-role unassigned';
+  }
+}
+
+function renderLobby(data) {
+  showScreen('lobby');
+  const players = data.players || {};
+  const redPlayers = Object.entries(players).filter(([,p]) => p.team === 'red');
+  const bluePlayers = Object.entries(players).filter(([,p]) => p.team === 'blue');
+  const me = players[myId];
+  const hostName = data.hostId && players[data.hostId] ? players[data.hostId].name : null;
+
+  document.getElementById('red-list').innerHTML = redPlayers.map(([id,p]) =>
+    `<div class="player-row">${id === data.hostId ? '👑 ' : ''}${p.name}<span class="spy-badge${p.isSpy?' active':''}">
+      ${p.isSpy ? '🕵️ SPY' : 'operative'}
+    </span></div>`).join('') || '<div style="color:var(--muted);font-size:.8rem;padding:4px">No players</div>';
+
+  document.getElementById('blue-list').innerHTML = bluePlayers.map(([id,p]) =>
+    `<div class="player-row">${id === data.hostId ? '👑 ' : ''}${p.name}<span class="spy-badge${p.isSpy?' active':''}">
+      ${p.isSpy ? '🕵️ SPY' : 'operative'}
+    </span></div>`).join('') || '<div style="color:var(--muted);font-size:.8rem;padding:4px">No players</div>';
+
+  // Show spy button only for my team, and only if no spy yet
+  const hasRedSpy = redPlayers.some(([,p]) => p.isSpy);
+  const hasBlueSpy = bluePlayers.some(([,p]) => p.isSpy);
+
+  const redSpyBtn = document.getElementById('red-spy-btn');
+  const blueSpyBtn = document.getElementById('blue-spy-btn');
+  const redJoinBtn = document.querySelector('#red-btns .btn-red');
+  const blueJoinBtn = document.querySelector('#blue-btns .btn-blue');
+
+  // Hide join buttons once player has a team (no switching)
+  if (redJoinBtn) redJoinBtn.style.display = me?.team ? 'none' : '';
+  if (blueJoinBtn) blueJoinBtn.style.display = me?.team ? 'none' : '';
+
+  redSpyBtn.style.display = (me?.team === 'red' && !me.isSpy) ? '' : 'none';
+  redSpyBtn.textContent = hasRedSpy ? '🕵️ Spy Taken' : '🕵️ Be Spy';
+  redSpyBtn.disabled = hasRedSpy;
+  blueSpyBtn.style.display = (me?.team === 'blue' && !me.isSpy) ? '' : 'none';
+  blueSpyBtn.textContent = hasBlueSpy ? '🕵️ Spy Taken' : '🕵️ Be Spy';
+  blueSpyBtn.disabled = hasBlueSpy;
+
+  // Show team count info on buttons
+  const redCount = redPlayers.length;
+  const blueCount = bluePlayers.length;
+  if (redJoinBtn && !me?.team) redJoinBtn.textContent = `Join Red (${redCount})`;
+  if (blueJoinBtn && !me?.team) blueJoinBtn.textContent = `Join Blue (${blueCount})`;
+
+  if (isHost) {
+    const canStart = hasRedSpy && hasBlueSpy;
+    document.getElementById('start-btn').disabled = !canStart;
+    document.getElementById('start-warning').style.display = canStart ? 'none' : '';
+    updateSettingsInfo();
+  }
+}
+
+window.joinTeam = async function(team) {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const me = data.players?.[myId];
+
+  // Block team switching once assigned
+  if (me?.team) {
+    showToast('You cannot change teams — reset the game to start fresh');
+    return;
+  }
+
+  const players = data.players || {};
+  const redCount = Object.values(players).filter(p => p.team === 'red').length;
+  const blueCount = Object.values(players).filter(p => p.team === 'blue').length;
+
+  // Enforce balance: target team can't have more than 1 extra player than the other
+  if (team === 'red' && redCount > blueCount + 1) {
+    showToast('Red team is full — join Blue to keep teams balanced');
+    return;
+  }
+  if (team === 'blue' && blueCount > redCount + 1) {
+    showToast('Blue team is full — join Red to keep teams balanced');
+    return;
+  }
+
+  await update(ref(db, `${roomPath}/players/${myId}`), { team, isSpy: false });
+};
+
+window.becomeSpy = async function(team) {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const existing = Object.values(data.players || {}).find(p => p.team === team && p.isSpy);
+  if (existing && existing.name !== myName) { showToast('Ask the current spy to resign first'); return; }
+  await update(ref(db, `${roomPath}/players/${myId}`), { team, isSpy: true });
+};
+
+window.startGame = async function() {
+  const n = parseInt(document.getElementById('s-words').value) || 8;
+  const clueTime = parseInt(document.getElementById('s-clue-time').value) || 90;
+  const guessTime = parseInt(document.getElementById('s-guess-time').value) || 60;
+  const maxTurns = parseInt(document.getElementById('s-max-turns').value) || 6;
+  const maxGuesses = parseInt(document.getElementById('s-max-guesses').value) || 3;
+  const board = buildBoard(n);
+  await update(roomRef, {
+    state: 'game',
+    board: board.words,
+    key: board.key,
+    revealed: {},
+    turn: 'red',
+    phase: 'clue',
+    clue: null,
+    clueNum: null,
+    guessesLeft: 0,
+    timerStart: Date.now(),
+    clueTime,
+    guessTime,
+    log: [],
+    wordsPerTeam: n,
+    maxTurns,
+    maxGuesses,
+    redTurnsUsed: 0,
+    blueTurnsUsed: 0,
+  });
+};
+
+function renderGame(data) {
+  showScreen('game');
+  clearInterval(timerInterval);
+  const { board, key, revealed = {}, turn, phase, clue, clueNum, players = {}, wordsPerTeam: wpT = 8 } = data;
+  const me = players[myId];
+  isSpymaster = me?.isSpy || false;
+  myTeam = me?.team || null;
+  const isMyTurn = myTeam === turn;
+  const isActiveSpy = isSpymaster && myTeam === turn;
+
+  // Score counts
+  const redLeft = board.filter(w => key[w] === 'red' && !revealed[w]).length;
+  const blueLeft = board.filter(w => key[w] === 'blue' && !revealed[w]).length;
+  document.getElementById('red-remaining').textContent = redLeft;
+  document.getElementById('blue-remaining').textContent = blueLeft;
+
+  // Turns remaining display
+  const maxTurns = data.maxTurns || 6;
+  const redUsed = data.redTurnsUsed || 0;
+  const blueUsed = data.blueTurnsUsed || 0;
+  const redLeft2 = Math.max(0, maxTurns - redUsed);
+  const blueLeft2 = Math.max(0, maxTurns - blueUsed);
+  const redTurnsEl = document.getElementById('red-turns-left');
+  const blueTurnsEl = document.getElementById('blue-turns-left');
+  if (redTurnsEl) redTurnsEl.textContent = redLeft2;
+  if (blueTurnsEl) blueTurnsEl.textContent = blueLeft2;
+
+  // Turn pill
+  const tp = document.getElementById('turn-pill');
+  tp.textContent = `${turn === 'red' ? '🔴 Red' : '🔵 Blue'}'s Turn · ${phase === 'clue' ? 'Giving Clue' : 'Guessing'}`;
+  tp.className = 'turn-pill ' + turn;
+
+  // Spy settings (show only for active spy in clue phase)
+  document.getElementById('spy-settings').style.display = (isActiveSpy && phase === 'clue') ? '' : 'none';
+
+  // Clue panel
+  const clueInputRow = document.getElementById('clue-input-row');
+  clueInputRow.style.display = (isActiveSpy && phase === 'clue') ? '' : 'none';
+  if (clue) {
+    document.getElementById('clue-word').textContent = clue.toUpperCase();
+    document.getElementById('clue-num').textContent = `for ${clueNum} word${clueNum>1?'s':''}`;
+  } else {
+    document.getElementById('clue-word').textContent = phase === 'clue' ? (isActiveSpy ? 'Enter your clue →' : 'Waiting for clue…') : '';
+    document.getElementById('clue-num').textContent = '';
+  }
+
+  // End turn button
+  const etBtn = document.getElementById('end-turn-btn');
+  etBtn.style.display = (isMyTurn && !isSpymaster && phase === 'guess') ? '' : 'none';
+
+  // Board
+  const grid = document.getElementById('board-grid');
+  const cols = 5;
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.innerHTML = '';
+  const canGuess = isMyTurn && !isSpymaster && phase === 'guess';
+  board.forEach(word => {
+    const cell = document.createElement('div');
+    cell.className = 'card-cell';
+    cell.textContent = word;
+    if (revealed[word]) {
+      cell.classList.add('revealed', key[word]);
+    } else if (isSpymaster) {
+      cell.classList.add('spy-view-' + key[word]);
+      cell.classList.add('disabled');
+    } else if (!canGuess) {
+      cell.classList.add('disabled');
+    } else {
+      cell.onclick = () => guessWord(word);
+    }
+    grid.appendChild(cell);
+  });
+
+  // Log
+  renderLog(data.log || []);
+
+  // Players list
+  const gpl = document.getElementById('game-player-list');
+  gpl.innerHTML = Object.values(players).map(p =>
+    `<div style="color:${p.team==='red'?'var(--red)':p.team==='blue'?'var(--blue)':'var(--muted)'};font-size:.78rem">
+      ${p.isSpy?'🕵️ ':'👤 '}${p.name}${p.team?' ('+p.team+')':''}
+    </div>`).join('');
+
+  // Timer
+  startTimerDisplay(data, turn, phase);
+}
+
+function startTimerDisplay(data, turn, phase) {
+  clearInterval(timerInterval);
+  const duration = phase === 'clue' ? (data.clueTime || 90) : (data.guessTime || 60);
+  const elapsed = Math.floor((Date.now() - (data.timerStart || Date.now())) / 1000);
+  let remaining = Math.max(0, duration - elapsed);
+  const pill = document.getElementById('timer-pill');
+
+  function update() {
+    pill.textContent = remaining + 's';
+    pill.className = 'timer-pill' + (remaining <= 10 ? ' urgent' : '');
+  }
+  update();
+  timerInterval = setInterval(() => {
+    remaining--;
+    update();
+    if (remaining <= 0) {
+      clearInterval(timerInterval);
+      if (isHost) {
+        if (phase === 'clue') {
+          // Skip turn
+          switchTurn();
+        } else {
+          switchTurn();
+        }
+      }
+    }
+  }, 1000);
+}
+
+window.giveClue = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const me = data.players?.[myId];
+  if (!me?.isSpy || data.turn !== myTeam) { showToast('Not your turn'); return; }
+  const clueText = document.getElementById('clue-text-input').value.trim();
+  const clueNum = parseInt(document.getElementById('clue-num-input').value) || 1;
+  if (!clueText || clueText.includes(' ')) { showToast('One word only'); return; }
+  const myClueTime = parseInt(document.getElementById('my-clue-time').value) || data.clueTime || 90;
+  // Always use host's guess time — Spymaster cannot override it
+  const hostGuessTime = data.guessTime || 60;
+  const log = data.log || [];
+  log.push({ team: data.turn, text: `${myName} clue: "${clueText.toUpperCase()}" for ${clueNum}` });
+  const maxGuesses = data.maxGuesses || 99;
+  // guessesLeft = clueNum + 1 bonus, but capped by host's maxGuesses setting
+  const cappedGuesses = Math.min(clueNum + 1, maxGuesses);
+  await update(roomRef, {
+    clue: clueText.toUpperCase(),
+    clueNum,
+    phase: 'guess',
+    guessesLeft: cappedGuesses,
+    timerStart: Date.now(),
+    guessTime: hostGuessTime,
+    clueTime: myClueTime,
+    log,
+  });
+  document.getElementById('clue-text-input').value = '';
+};
+
+window.guessWord = async function(word) {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data.state !== 'game' || data.phase !== 'guess' || data.turn !== myTeam || isSpymaster) return;
+  const revealed = { ...(data.revealed || {}) };
+  if (revealed[word]) return;
+  revealed[word] = true;
+  const log = data.log || [];
+  const type = data.key[word];
+  log.push({ team: myTeam, text: `${myName} guessed "${word}" → ${type}` });
+
+  // Check win
+  const wpT = data.wordsPerTeam || 8;
+  const allRed = data.board.filter(w => data.key[w] === 'red');
+  const allBlue = data.board.filter(w => data.key[w] === 'blue');
+  const revObj = revealed;
+  const redDone = allRed.every(w => revObj[w]);
+  const blueDone = allBlue.every(w => revObj[w]);
+
+  if (type === 'assassin') {
+    await update(roomRef, { revealed, log, state: 'result', winner: myTeam === 'red' ? 'blue' : 'red', reason: 'assassin', winnerTeam: myTeam === 'red' ? 'blue' : 'red' });
+    return;
+  }
+  if (redDone) { await update(roomRef, { revealed, log, state: 'result', winner: 'red', reason: 'all found', winnerTeam: 'red' }); return; }
+  if (blueDone) { await update(roomRef, { revealed, log, state: 'result', winner: 'blue', reason: 'all found', winnerTeam: 'blue' }); return; }
+
+  let guessesLeft = (data.guessesLeft || 1) - 1;
+  if (type !== myTeam || guessesLeft <= 0) {
+    // End turn
+    await update(roomRef, { revealed, log });
+    await switchTurn();
+  } else {
+    // Do NOT reset timerStart — the guess timer runs for the full turn, not per guess
+    await update(roomRef, { revealed, guessesLeft, log });
+  }
+};
+
+async function switchTurn() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data.state !== 'game') return;
+
+  // Increment turn counter for the team that just finished
+  const finishedTeam = data.turn;
+  const maxTurns = data.maxTurns || 6;
+  const redTurnsUsed = (data.redTurnsUsed || 0) + (finishedTeam === 'red' ? 1 : 0);
+  const blueTurnsUsed = (data.blueTurnsUsed || 0) + (finishedTeam === 'blue' ? 1 : 0);
+
+  const log = data.log || [];
+
+  // Check if turns are exhausted — determine winner by revealed words
+  if (redTurnsUsed >= maxTurns && blueTurnsUsed >= maxTurns) {
+    const revealed = data.revealed || {};
+    const redFound = data.board.filter(w => data.key[w] === 'red' && revealed[w]).length;
+    const blueFound = data.board.filter(w => data.key[w] === 'blue' && revealed[w]).length;
+    const winner = redFound > blueFound ? 'red' : blueFound > redFound ? 'blue' : 'draw';
+    log.push({ team: 'red', text: `— All turns used · Red: ${redFound} · Blue: ${blueFound} —` });
+    await update(roomRef, {
+      log,
+      redTurnsUsed,
+      blueTurnsUsed,
+      state: 'result',
+      winner: winner === 'draw' ? 'red' : winner,
+      reason: winner === 'draw' ? 'draw' : 'turns exhausted',
+      redFound,
+      blueFound,
+    });
+    return;
+  }
+
+  // If next team has used all their turns, skip them
+  const newTurn = data.turn === 'red' ? 'blue' : 'red';
+  const nextTurnsUsed = newTurn === 'red' ? redTurnsUsed : blueTurnsUsed;
+  if (nextTurnsUsed >= maxTurns) {
+    // Skip to the other team again
+    const skipLog = [...log];
+    skipLog.push({ team: newTurn, text: `— ${newTurn.toUpperCase()} has no turns left, skipping —` });
+    const finalTurn = newTurn === 'red' ? 'blue' : 'red';
+    skipLog.push({ team: finalTurn, text: `— ${finalTurn.toUpperCase()}'s turn —` });
+    await update(roomRef, { turn: finalTurn, phase: 'clue', clue: null, clueNum: null, guessesLeft: 0, timerStart: Date.now(), log: skipLog, redTurnsUsed, blueTurnsUsed });
+    return;
+  }
+
+  log.push({ team: newTurn, text: `— ${newTurn.toUpperCase()}'s turn (${maxTurns - nextTurnsUsed} turn${maxTurns - nextTurnsUsed !== 1 ? 's' : ''} left) —` });
+  await update(roomRef, {
+    turn: newTurn,
+    phase: 'clue',
+    clue: null,
+    clueNum: null,
+    guessesLeft: 0,
+    timerStart: Date.now(),
+    log,
+    redTurnsUsed,
+    blueTurnsUsed,
+  });
+}
+
+window.endTurn = async function() { await switchTurn(); };
+
+function showResult(data) {
+  clearInterval(timerInterval);
+  const overlay = document.getElementById('result-overlay');
+  overlay.classList.add('show');
+
+  const heading  = document.getElementById('result-heading');
+  const reason   = document.getElementById('result-reason');
+  const icon     = document.getElementById('result-icon');
+  const banner   = document.getElementById('result-banner');
+  const teamsDiv = document.getElementById('result-teams');
+
+  const isDraw = data.reason === 'draw';
+  const winner = data.winner; // 'red' | 'blue'
+  const loser  = winner === 'red' ? 'blue' : 'red';
+
+  // ── Banner ──────────────────────────────────────────────────────────────
+  if (isDraw) {
+    icon.textContent = '🤝';
+    heading.textContent = "IT'S A DRAW!!!";
+    heading.className = 'draw';
+    banner.className = 'result-banner draw';
+    reason.textContent = `All turns used — perfectly matched! Red: ${data.redFound || 0} · Blue: ${data.blueFound || 0}`;
+  } else {
+    icon.textContent = '🏆';
+    heading.textContent = `${winner.toUpperCase()} TEAM ARE THE WINNERS!!!`;
+    heading.className = winner;
+    banner.className = `result-banner winner-${winner}`;
+    if (data.reason === 'assassin') {
+      reason.textContent = `The assassin card was hit by ${loser} — ${winner.toUpperCase()} team wins!`;
+    } else if (data.reason === 'turns exhausted') {
+      reason.textContent = `All turns used! Red found ${data.redFound || 0} · Blue found ${data.blueFound || 0}`;
+    } else {
+      reason.textContent = `All ${winner} words found!`;
+    }
+  }
+
+  // ── Build player lists ──────────────────────────────────────────────────
+  const players = data.players || {};
+
+  function buildTeamCard(team, isWinner) {
+    const teamPlayers = Object.values(players).filter(p => p.team === team);
+    const card = document.createElement('div');
+
+    if (isDraw) {
+      card.className = `result-team-card`;
+      const colour = team === 'red' ? 'var(--red)' : 'var(--blue)';
+      card.innerHTML = `
+        <div class="team-result-icon">🤝</div>
+        <div class="team-result-label ${team}">${team.toUpperCase()} TEAM — DRAW</div>
+        <div class="result-player-list">
+          ${teamPlayers.map(p => `
+            <div class="result-player">
+              ${p.isSpy ? '🕵️' : '👤'}
+              <span>${p.name}</span>
+              <span class="role-tag">${p.isSpy ? 'Spymaster' : 'Operative'}</span>
+            </div>`).join('')}
+        </div>`;
+    } else if (isWinner) {
+      card.className = `result-team-card win ${team}`;
+      card.innerHTML = `
+        <div class="team-result-icon">🏆</div>
+        <div class="team-result-label ${team}">${team.toUpperCase()} TEAM — WINNERS!!!</div>
+        <div class="result-player-list">
+          ${teamPlayers.map(p => `
+            <div class="result-player">
+              ${p.isSpy ? '🕵️' : '👤'}
+              <span>${p.name}</span>
+              <span class="role-tag">${p.isSpy ? 'Spymaster' : 'Operative'}</span>
+            </div>`).join('')}
+        </div>`;
+    } else {
+      card.className = `result-team-card`;
+      card.innerHTML = `
+        <div class="team-result-icon">😔</div>
+        <div class="team-result-label lose">${team.toUpperCase()} TEAM — BETTER LUCK NEXT TIME</div>
+        <div class="result-player-list">
+          ${teamPlayers.map(p => `
+            <div class="result-player">
+              ${p.isSpy ? '🕵️' : '👤'}
+              <span>${p.name}</span>
+              <span class="role-tag">${p.isSpy ? 'Spymaster' : 'Operative'}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+    return card;
+  }
+
+  teamsDiv.innerHTML = '';
+  if (isDraw) {
+    teamsDiv.appendChild(buildTeamCard('red', false));
+    teamsDiv.appendChild(buildTeamCard('blue', false));
+  } else {
+    // Winner card first, then loser
+    teamsDiv.appendChild(buildTeamCard(winner, true));
+    teamsDiv.appendChild(buildTeamCard(loser, false));
+  }
+}
+
+window.closeOverlay = function() {
+  document.getElementById('result-overlay').classList.remove('show');
+};
+
+window.playAgain = async function() {
+  document.getElementById('result-overlay').classList.remove('show');
+  isHost = false;
+  myTeam = null;
+  isSpymaster = false;
+  document.getElementById('host-settings').style.display = 'none';
+  document.getElementById('host-claimed-msg').style.display = 'none';
+  document.getElementById('lobby-reset-btn').style.display = 'none';
+  document.getElementById('claim-host-btn').style.display = '';
+  document.getElementById('lobby-wait-msg').style.display = '';
+  // Clear all player team/spy assignments for fresh game
+  const snap2 = await get(roomRef);
+  const players2 = snap2.val()?.players || {};
+  const resetPlayers = {};
+  Object.entries(players2).forEach(([id, p]) => { resetPlayers[id] = { ...p, team: null, isSpy: false }; });
+  await update(roomRef, { state: 'lobby', board: null, key: null, revealed: null, turn: null, phase: null, clue: null, log: null, hostId: null, players: resetPlayers });
+  updateStatusBar();
+};
+
+function renderLog(log) {
+  const list = document.getElementById('log-list');
+  list.innerHTML = [...log].reverse().slice(0, 20).map(l =>
+    `<div class="log-item ${l.team}"><em>${l.text}</em></div>`
+  ).join('');
+}
+
+window.showResetDialog = function() {
+  document.getElementById('reset-overlay').classList.add('show');
+};
+window.closeResetDialog = function() {
+  document.getElementById('reset-overlay').classList.remove('show');
+};
+window.confirmReset = async function() {
+  document.getElementById('reset-overlay').classList.remove('show');
+  if (!db) {
+    const fbUrl = document.getElementById('fb-url').value.trim();
+    const room = document.getElementById('room-name').value.trim();
+    try {
+      const { initializeApp: ia } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getDatabase: gd, ref: r } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      const app = ia({ databaseURL: fbUrl }, 'cn-reset-' + Date.now());
+      db = gd(app);
+      roomRef = r(db, 'codenames/' + room);
+    } catch(e) { showToast('Could not connect to reset'); return; }
+  }
+  try {
+    const { remove } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+    await remove(roomRef);
+    isHost = false;
+    document.getElementById('host-settings').style.display = 'none';
+    document.getElementById('host-claimed-msg').style.display = 'none';
+    document.getElementById('lobby-reset-btn').style.display = 'none';
+    document.getElementById('claim-host-btn').style.display = '';
+    document.getElementById('status-bar').textContent = 'Not connected';
+    showScreen('setup');
+    showToast('Game reset — ready for a fresh start!');
+  } catch(e) { showToast('Reset failed: ' + e.message); }
+};
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

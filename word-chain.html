@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Team Word Chain</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0818;
+    --surface: #170f2a;
+    --surface2: #1f1538;
+    --border: #2e1f52;
+    --ink: #e8f4ff;
+    --accent: #7dd3fc;
+    --accent2: #38bdf8;
+    --green: #34d399;
+    --muted: #6b5f8a;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header {
+    width: 100%;
+    padding: 16px 32px;
+    background: #0a0514;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 1.3rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo .chain { color: var(--accent); }
+  #status-bar {
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: #1f1538;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .screen { display: none; width: 100%; max-width: 820px; padding: 32px 20px; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+  /* SETUP */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 100%;
+  }
+  .card h2 {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .input-group label { font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+  input[type=text], input[type=url], input[type=number] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  input:focus { border-color: var(--accent); }
+  .btn {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 11px 22px;
+    transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #0a0514; }
+  .btn-primary:hover { opacity: .88; }
+  .btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-accent:hover { opacity: .88; }
+  .btn-secondary { background: var(--surface2); color: var(--ink); }
+  .btn-secondary:hover { opacity: .88; }
+  .btn-sm { padding: 7px 14px; font-size: 0.82rem; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .w100 { width: 100%; }
+
+  /* LOBBY */
+  .lobby-header {
+    width: 100%;
+    text-align: center;
+    padding: 24px 0 12px;
+  }
+  .lobby-header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+  .lobby-header h1 em { color: var(--accent); font-style: normal; }
+  .room-tag {
+    display: inline-block;
+    margin-top: 8px;
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.78rem;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .player-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .player-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .player-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+  .settings-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  /* GAME */
+  .game-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .round-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    padding: 5px 14px;
+    border-radius: 4px;
+  }
+  .timer-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 20px;
+    text-align: center;
+    min-width: 80px;
+  }
+  .timer-block .t-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .timer-block .t-num.urgent { color: var(--accent); }
+  .timer-block .t-label { font-size: 0.65rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+  .word-display {
+    width: 100%;
+    background: #0a0514;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px 28px;
+    text-align: center;
+  }
+  .word-display .hint { font-size: 0.75rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-family: 'Space Mono', monospace; }
+  .word-display .word {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+  .word-display .rule {
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+  .word-display .rule em { color: var(--accent); font-style: normal; }
+
+  .answer-area {
+    width: 100%;
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .answer-area input {
+    flex: 1;
+    font-size: 1.4rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 14px;
+    font-family: 'Space Mono', monospace;
+  }
+  .answer-area input.shake { animation: shake .4s; }
+  @keyframes shake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
+  }
+  .answer-area input.correct-flash { border-color: var(--green); background: rgba(52,211,153,.08); }
+
+  .error-msg {
+    min-height: 22px;
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .feed-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .feed-item {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+  }
+  .feed-item .fi-word { font-family: 'Space Mono', monospace; font-weight: 700; letter-spacing: 2px; }
+  .feed-item .fi-name { color: var(--muted); font-size: 0.8rem; }
+  .feed-item .fi-pts { font-family: 'Space Mono', monospace; font-weight: 700; color: var(--green); }
+
+  .score-list { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .score-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .score-rank { font-family: 'Space Mono', monospace; font-size: 1.2rem; font-weight: 700; width: 30px; color: var(--muted); }
+  .score-rank.gold { color: #c8960a; }
+  .score-rank.silver { color: #777; }
+  .score-rank.bronze { color: #a0520a; }
+  .score-bar-wrap { flex: 1; }
+  .score-name { font-weight: 700; margin-bottom: 4px; }
+  .score-bar { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .score-bar-fill { height: 100%; background: var(--ink); border-radius: 3px; transition: width .6s; }
+  .score-pts { font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700; }
+
+  .podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px 0;
+    width: 100%;
+  }
+  .podium-col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .podium-name { font-weight: 800; font-size: 0.95rem; text-align: center; max-width: 110px; }
+  .podium-pts { font-size: 0.8rem; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .podium-block {
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.6rem;
+    width: 110px;
+    border: 2px solid var(--ink);
+  }
+  .podium-1 { height: 120px; background: var(--accent); color: #fff; border-color: var(--accent); }
+  .podium-2 { height: 88px; background: #1f1538; border: 1px solid var(--border); color: var(--accent); }
+  .podium-3 { height: 62px; background: var(--surface2); color: var(--accent); border: 1px solid var(--border); }
+
+  .section-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 6px;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  #toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 11px 22px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: 'Space Mono', monospace;
+    transition: transform .3s;
+    z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  .flex-row { display: flex; align-items: center; gap: 10px; }
+  .flex-row-sb { display: flex; align-items: center; justify-content: space-between; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .text-muted { color: var(--muted); font-size: 0.82rem; }
+  .text-center { text-align: center; }
+
+  @media(max-width:600px) {
+    .settings-row { grid-template-columns: 1fr; }
+    .podium-block { width: 80px; }
+  }
+  .reset-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.8); z-index: 300;
+    align-items: center; justify-content: center;
+  }
+  .reset-overlay.show { display: flex; }
+  .reset-box {
+    background: var(--surface); border: 1px solid #e74c3c;
+    border-radius: var(--radius); padding: 32px 36px;
+    text-align: center; max-width: 380px; width: 90%;
+  }
+  .reset-box h3 { font-family: 'Space Mono',monospace; font-size: 1.4rem; letter-spacing: 2px; color: #e74c3c; margin-bottom: 10px; }
+  .reset-box p { font-size: 0.85rem; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+  .btn-danger { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+  .btn-danger:hover { opacity: .85; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    DB TEAM <span class="chain">WORD CHAIN</span>
+  </div>
+  <div id="status-bar">Not connected</div>
+</header>
+
+<!-- SETUP -->
+<div id="setup-screen" class="screen active">
+  <div style="text-align:center;margin-bottom:16px">
+    <!-- Word chain icon: APPLE → ELBOW → WINDS -->
+    <svg width="590" height="60" viewBox="0 0 590 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto">
+      <!-- APPLE letters: A=17, P=51, P=85, L=119, E=153 -->
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <!-- APPLE word connector lines -->
+        <line x1="32" y1="30" x2="36" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="66" y1="30" x2="70" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="100" y1="30" x2="104" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="134" y1="30" x2="138" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <!-- A -->
+        <circle cx="17" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="17" y="35" fill="#7dd3fc">A</text>
+        <!-- P -->
+        <circle cx="51" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/>
+        <text x="51" y="35" fill="#38bdf8">P</text>
+        <!-- P -->
+        <circle cx="85" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="85" y="35" fill="#7dd3fc">P</text>
+        <!-- L -->
+        <circle cx="119" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/>
+        <text x="119" y="35" fill="#38bdf8">L</text>
+        <!-- E (last letter, highlighted) -->
+        <circle cx="153" cy="30" r="15" fill="#2e1f52" stroke="#f0abfc" stroke-width="2.5"/>
+        <text x="153" y="35" fill="#f0abfc">E</text>
+      </g>
+
+      <!-- Chain link connector between APPLE and ELBOW (E connects to E) -->
+      <g opacity="0.9">
+        <line x1="168" y1="30" x2="178" y2="30" stroke="#f0abfc" stroke-width="2"/>
+        <ellipse cx="178" cy="24" rx="8" ry="5" stroke="#f0abfc" stroke-width="2" fill="#1f1538"/>
+        <ellipse cx="178" cy="36" rx="8" ry="5" stroke="#f0abfc" stroke-width="2" fill="#1f1538"/>
+        <line x1="188" y1="30" x2="198" y2="30" stroke="#f0abfc" stroke-width="2"/>
+      </g>
+
+      <!-- ELBOW letters: E=215, L=249, B=283, O=317, W=351 -->
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <line x1="230" y1="30" x2="234" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="264" y1="30" x2="268" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="298" y1="30" x2="302" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="332" y1="30" x2="336" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <!-- E (first letter, highlighted — matches APPLE's last E) -->
+        <circle cx="215" cy="30" r="15" fill="#2e1f52" stroke="#f0abfc" stroke-width="2.5"/>
+        <text x="215" y="35" fill="#f0abfc">E</text>
+        <!-- L -->
+        <circle cx="249" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="249" y="35" fill="#7dd3fc">L</text>
+        <!-- B -->
+        <circle cx="283" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/>
+        <text x="283" y="35" fill="#38bdf8">B</text>
+        <!-- O -->
+        <circle cx="317" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="317" y="35" fill="#7dd3fc">O</text>
+        <!-- W (last letter, highlighted) -->
+        <circle cx="351" cy="30" r="15" fill="#2e1f52" stroke="#fbbf24" stroke-width="2.5"/>
+        <text x="351" y="35" fill="#fbbf24">W</text>
+      </g>
+
+      <!-- Chain link connector between ELBOW and WINDS (W connects to W) -->
+      <g opacity="0.9">
+        <line x1="366" y1="30" x2="376" y2="30" stroke="#fbbf24" stroke-width="2"/>
+        <ellipse cx="376" cy="24" rx="8" ry="5" stroke="#fbbf24" stroke-width="2" fill="#1f1538"/>
+        <ellipse cx="376" cy="36" rx="8" ry="5" stroke="#fbbf24" stroke-width="2" fill="#1f1538"/>
+        <line x1="386" y1="30" x2="396" y2="30" stroke="#fbbf24" stroke-width="2"/>
+      </g>
+
+      <!-- WINDS letters: W=413, I=447, N=481, D=515, S=549 -->
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <line x1="428" y1="30" x2="432" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="462" y1="30" x2="466" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="496" y1="30" x2="500" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="530" y1="30" x2="534" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <!-- W (first letter, highlighted — matches ELBOW's last W) -->
+        <circle cx="413" cy="30" r="15" fill="#2e1f52" stroke="#fbbf24" stroke-width="2.5"/>
+        <text x="413" y="35" fill="#fbbf24">W</text>
+        <!-- I -->
+        <circle cx="447" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="447" y="35" fill="#7dd3fc">I</text>
+        <!-- N -->
+        <circle cx="481" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/>
+        <text x="481" y="35" fill="#38bdf8">N</text>
+        <!-- D -->
+        <circle cx="515" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="515" y="35" fill="#7dd3fc">D</text>
+        <!-- S -->
+        <circle cx="549" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/>
+        <text x="549" y="35" fill="#38bdf8">S</text>
+      </g>
+
+      <!-- Word labels underneath -->
+      <g font-family="Space Mono, monospace" font-size="9" text-anchor="middle" fill="#6b5f8a" opacity="0.8">
+        <text x="85" y="54">A P P L E</text>
+        <text x="283" y="54">E L B O W</text>
+        <text x="481" y="54">W I N D S</text>
+      </g>
+    </svg>
+    <h1 style="font-family:'Space Mono',monospace;font-size:1.9rem;font-weight:700;letter-spacing:2px;color:#7dd3fc;margin-top:14px;line-height:1.2">Welcome to DB Team<br><span style="color:#38bdf8">Word Chain!!!</span></h1>
+    <p style="color:#6b5f8a;font-size:0.85rem;margin-top:8px">Enter your name to join</p>
+  </div>
+  <div class="card" style="max-width:460px">
+    <div class="input-group">
+      <label>Your Name</label>
+      <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
+    </div>
+    <button class="btn btn-primary w100" style="margin-top:10px" onclick="joinRoom()">Join Game →</button>
+    <p class="text-muted mt8">Anyone in the lobby can become the host.</p>
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+    <button class="btn btn-secondary w100" onclick="showResetDialog()" style="opacity:.7;font-size:0.85rem">🔄 Reset Previous Game</button>
+    <p class="text-muted mt8" style="font-size:0.75rem">Use this if the page is stuck on a previous game state.</p>
+  </div>
+  <!-- Baked-in config -->
+  <input type="hidden" id="fb-url" value="https://word-chain-77b51-default-rtdb.firebaseio.com/">
+  <input type="hidden" id="room-name" value="wordchain-room">
+</div>
+
+<!-- LOBBY -->
+<div id="lobby-screen" class="screen">
+  <div class="lobby-header">
+    <h1>DB TEAM <em>WORD CHAIN</em></h1>
+    <svg width="400" height="44" viewBox="0 0 590 60" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto;margin-top:10px">
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <line x1="32" y1="30" x2="36" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="66" y1="30" x2="70" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="100" y1="30" x2="104" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="134" y1="30" x2="138" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <circle cx="17" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="17" y="35" fill="#7dd3fc">A</text>
+        <circle cx="51" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/><text x="51" y="35" fill="#38bdf8">P</text>
+        <circle cx="85" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="85" y="35" fill="#7dd3fc">P</text>
+        <circle cx="119" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/><text x="119" y="35" fill="#38bdf8">L</text>
+        <circle cx="153" cy="30" r="15" fill="#2e1f52" stroke="#f0abfc" stroke-width="2.5"/><text x="153" y="35" fill="#f0abfc">E</text>
+      </g>
+      <g opacity="0.9">
+        <line x1="168" y1="30" x2="178" y2="30" stroke="#f0abfc" stroke-width="2"/>
+        <ellipse cx="178" cy="24" rx="8" ry="5" stroke="#f0abfc" stroke-width="2" fill="#1f1538"/>
+        <ellipse cx="178" cy="36" rx="8" ry="5" stroke="#f0abfc" stroke-width="2" fill="#1f1538"/>
+        <line x1="188" y1="30" x2="198" y2="30" stroke="#f0abfc" stroke-width="2"/>
+      </g>
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <line x1="230" y1="30" x2="234" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="264" y1="30" x2="268" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="298" y1="30" x2="302" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="332" y1="30" x2="336" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <circle cx="215" cy="30" r="15" fill="#2e1f52" stroke="#f0abfc" stroke-width="2.5"/><text x="215" y="35" fill="#f0abfc">E</text>
+        <circle cx="249" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="249" y="35" fill="#7dd3fc">L</text>
+        <circle cx="283" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/><text x="283" y="35" fill="#38bdf8">B</text>
+        <circle cx="317" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="317" y="35" fill="#7dd3fc">O</text>
+        <circle cx="351" cy="30" r="15" fill="#2e1f52" stroke="#fbbf24" stroke-width="2.5"/><text x="351" y="35" fill="#fbbf24">W</text>
+      </g>
+      <g opacity="0.9">
+        <line x1="366" y1="30" x2="376" y2="30" stroke="#fbbf24" stroke-width="2"/>
+        <ellipse cx="376" cy="24" rx="8" ry="5" stroke="#fbbf24" stroke-width="2" fill="#1f1538"/>
+        <ellipse cx="376" cy="36" rx="8" ry="5" stroke="#fbbf24" stroke-width="2" fill="#1f1538"/>
+        <line x1="386" y1="30" x2="396" y2="30" stroke="#fbbf24" stroke-width="2"/>
+      </g>
+      <g font-family="Space Mono, monospace" font-size="15" font-weight="700" text-anchor="middle">
+        <line x1="428" y1="30" x2="432" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="462" y1="30" x2="466" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="496" y1="30" x2="500" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <line x1="530" y1="30" x2="534" y2="30" stroke="#7dd3fc" stroke-width="1.5" opacity="0.4"/>
+        <circle cx="413" cy="30" r="15" fill="#2e1f52" stroke="#fbbf24" stroke-width="2.5"/><text x="413" y="35" fill="#fbbf24">W</text>
+        <circle cx="447" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="447" y="35" fill="#7dd3fc">I</text>
+        <circle cx="481" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/><text x="481" y="35" fill="#38bdf8">N</text>
+        <circle cx="515" cy="30" r="15" fill="#1f1538" stroke="#7dd3fc" stroke-width="2"/><text x="515" y="35" fill="#7dd3fc">D</text>
+        <circle cx="549" cy="30" r="15" fill="#1f1538" stroke="#38bdf8" stroke-width="2"/><text x="549" y="35" fill="#38bdf8">S</text>
+      </g>
+      <g font-family="Space Mono, monospace" font-size="9" text-anchor="middle" fill="#6b5f8a" opacity="0.8">
+        <text x="85" y="54">A P P L E</text>
+        <text x="283" y="54">E L B O W</text>
+        <text x="481" y="54">W I N D S</text>
+      </g>
+    </svg>
+    <span class="room-tag" id="room-label">room: —</span>
+  </div>
+
+  <div class="card w100 mt16">
+    <div class="flex-row-sb" style="margin-bottom:14px">
+      <span style="font-weight:800;font-size:1.05rem">👥 Players</span>
+    </div>
+    <div class="player-grid" id="player-grid"></div>
+    <div style="margin-top:14px;text-align:center">
+      <button class="btn btn-secondary" id="claim-host-btn" onclick="claimHost()" style="display:none">👑 Become Host</button>
+      <p class="text-muted mt8" id="host-claimed-msg" style="display:none">You are the host — configure settings below.</p>
+      <button class="btn btn-secondary" id="lobby-reset-btn" onclick="showResetDialog()" style="display:none;margin-top:10px;opacity:.7;font-size:0.82rem">🔄 Reset Game</button>
+    </div>
+  </div>
+
+  <div class="card w100 mt16" id="host-settings" style="display:none">
+    <h2>Game Settings</h2>
+    <div class="settings-row">
+      <div class="input-group">
+        <label>Rounds</label>
+        <input type="number" id="setting-rounds" min="3" max="20" value="8">
+      </div>
+      <div class="input-group">
+        <label>Seconds per round</label>
+        <input type="number" id="setting-secs" min="15" max="60" value="30">
+      </div>
+    </div>
+    <button class="btn btn-primary w100" onclick="startGame()">Start Game</button>
+  </div>
+  <p class="text-muted text-center mt8" id="wait-msg" style="display:none">Waiting for host to start…</p>
+</div>
+
+<!-- GAME -->
+<div id="game-screen" class="screen">
+  <div class="game-header w100">
+    <div class="round-tag" id="round-tag">ROUND 1 / 8</div>
+    <div class="timer-block">
+      <div class="t-num" id="t-num">30</div>
+      <div class="t-label">seconds</div>
+    </div>
+  </div>
+
+  <div class="word-display w100">
+    <div class="hint">Current word</div>
+    <div class="word" id="current-word">—</div>
+    <div class="rule" id="word-rule">Start with <em>?</em> · Length <em>?</em></div>
+  </div>
+
+  <div class="answer-area">
+    <input type="text" id="word-input" placeholder="YOUR WORD" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="btn btn-accent" onclick="submitWord()">→</button>
+  </div>
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="section-title mt16">Live Feed</div>
+  <div class="feed-list" id="feed-list"></div>
+
+  <div id="host-round-ctrl" style="display:none;margin-top:14px">
+    <button class="btn btn-secondary btn-sm" onclick="endRound()">End Round Early</button>
+  </div>
+</div>
+
+<!-- ROUND SCORE SCREEN -->
+<div id="score-screen" class="screen">
+  <div class="section-title">ROUND SCORES</div>
+  <div class="score-list w100" id="score-list"></div>
+  <div id="score-host-ctrl" style="display:none;margin-top:16px">
+    <button class="btn btn-primary" id="score-next-btn" onclick="nextRound()">Next Round →</button>
+  </div>
+  <p class="text-muted text-center mt8" id="score-wait-msg" style="display:none">Waiting for host…</p>
+</div>
+
+<!-- FINAL -->
+<div id="final-screen" class="screen">
+  <div style="font-family:'Space Mono',monospace;font-size:2.4rem;font-weight:700;letter-spacing:2px;text-align:center;margin-bottom:8px">GAME OVER</div>
+  <div class="podium w100" id="podium"></div>
+  <div class="section-title">Leaderboard</div>
+  <div class="score-list w100" id="final-score-list"></div>
+  <button class="btn btn-primary" style="margin-top:24px" onclick="playAgain()">Play Again</button>
+</div>
+
+<div id="toast"></div>
+
+<!-- Reset Confirm Overlay -->
+<div class="reset-overlay" id="reset-overlay">
+  <div class="reset-box">
+    <h3>⚠️ Reset Game?</h3>
+    <p>This will clear all players, scores and game state — returning everything to a fresh lobby.<br><br>Everyone currently in the game will be disconnected.</p>
+    <div class="flex-row" style="justify-content:center;gap:10px">
+      <button class="btn btn-danger" onclick="confirmReset()">Yes, Reset</button>
+      <button class="btn btn-secondary" onclick="closeResetDialog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+let db, roomRef, myId, myName, isHost = false;
+let timerInterval, gameSettings = { rounds: 8, secs: 30 };
+let hasAnswered = false, roundStartTime = 0;
+let currentScreen = 'setup';
+
+// Curated word list (length 3-9)
+const WORDS = [
+  'apple','eagle','elder','drawn','night','tiger','remix','index','extra','arena',
+  'about','table','elite','every','yacht','tenth','heavy','yacht','yahoo','onset',
+  'lemon','novel','lobby','yeast','trite','ember','rugby','young','green','noble',
+  'below','water','right','tiger','error','remix','xerox','xenon','ultra','aloof',
+  'blind','defer','fence','enter','rival','limit','tapir','roast','tiger','rugby',
+  'bring','grain','naval','laden','north','heavy','yield','dream','mango','ocean',
+  'train','night','tiger','rebut','toxic','cycle','early','youth','haste','ember',
+  'plant','talon','never','rider','risen','novel','lemon','minor','order','remix',
+  'cloud','delta','atlas','space','petal','lower','rocky','yacht','noble','ember',
+  'grill','lucky','yield','delta','again','north','horse','eager','relay','yacht',
+  'shark','karma','abbey','youth','hotel','limit','trend','demo','neon','over',
+  'storm','moon','nail','lamp','port','rust','tusk','snow','flux','gust',
+  'crisp','plank','frost','brave','blend','grasp','swift','prism','glint','brisk',
+  'dwarf','flask','scout','trout','bland','clamp','grove','stunt','crave','drift',
+];
+
+function pickWord(len) {
+  const pool = WORDS.filter(w => len ? w.length === len : true);
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].toUpperCase() : null;
+}
+
+function getStartLetter(word) { return word.slice(-1).toUpperCase(); }
+
+window.joinRoom = async function() {
+  const fbUrl = document.getElementById('fb-url').value.trim();
+  const room = document.getElementById('room-name').value.trim();
+  const name = document.getElementById('player-name').value.trim();
+  if (!fbUrl || !room || !name) { showToast('Fill all fields'); return; }
+  try {
+    const app = initializeApp({ databaseURL: fbUrl }, 'wc-' + Date.now());
+    db = getDatabase(app);
+    roomRef = ref(db, 'wordchain/' + room);
+    myName = name;
+    myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    await update(ref(db, `wordchain/${room}/players/${myId}`), { name, joinedAt: Date.now(), score: 0 });
+    const snap = await get(roomRef);
+    const data = snap.val();
+    if (!data?.state) await update(roomRef, { state: 'lobby' });
+    isHost = false;
+    document.getElementById('host-settings').style.display = 'none';
+    document.getElementById('wait-msg').style.display = '';
+    document.getElementById('score-wait-msg').style.display = '';
+    document.getElementById('claim-host-btn').style.display = '';
+    document.getElementById('status-bar').textContent = `${room} · ${name}`;
+    document.getElementById('room-label').textContent = `room: ${room}`;
+    showScreen('lobby');
+    subscribeRoom(room);
+  } catch(e) { showToast('Connection failed: ' + e.message); }
+};
+
+window.claimHost = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data?.hostId && data.hostId !== myId) { showToast('Someone is already the host'); return; }
+  await update(roomRef, { hostId: myId });
+  becomeHost();
+};
+
+function becomeHost() {
+  isHost = true;
+  document.getElementById('host-settings').style.display = '';
+  document.getElementById('wait-msg').style.display = 'none';
+  document.getElementById('score-host-ctrl').style.display = '';
+  document.getElementById('claim-host-btn').style.display = 'none';
+  document.getElementById('host-claimed-msg').style.display = '';
+  document.getElementById('lobby-reset-btn').style.display = '';
+  const sb = document.getElementById('status-bar');
+  sb.textContent = sb.textContent.replace(' (host)','') + ' (host)';
+}
+
+function subscribeRoom(room) {
+  onValue(roomRef, snap => {
+    const data = snap.val();
+    if (!data) return;
+    renderPlayers(data.players || {}, data.hostId);
+    if (data.hostId === myId && !isHost) becomeHost();
+    const claimBtn = document.getElementById('claim-host-btn');
+    if (claimBtn && !isHost) {
+      const takenByOther = data.hostId && data.hostId !== myId;
+      claimBtn.textContent = takenByOther ? '👑 Host Taken' : '👑 Become Host';
+      claimBtn.disabled = takenByOther;
+    }
+    if (data.state === 'round' && currentScreen !== 'game') showScreen('game');
+    if (data.state === 'round') renderRound(data);
+    if (data.state === 'scoreboard') showScoreScreen(data);
+    if (data.state === 'final') showFinalScreen(data);
+    if (data.state === 'lobby' && currentScreen !== 'lobby') showScreen('lobby');
+  });
+}
+
+function renderPlayers(players, hostId) {
+  const grid = document.getElementById('player-grid');
+  grid.innerHTML = '';
+  Object.entries(players).sort((a,b) => a[1].joinedAt - b[1].joinedAt).forEach(([id, p]) => {
+    const div = document.createElement('div');
+    div.className = 'player-chip';
+    div.innerHTML = `<span class="dot"></span>${id === hostId ? '<span style="color:#e63946">👑</span> ' : ''}${p.name}`;
+    grid.appendChild(div);
+  });
+}
+
+window.startGame = async function() {
+  const rounds = parseInt(document.getElementById('setting-rounds').value) || 8;
+  const secs = parseInt(document.getElementById('setting-secs').value) || 30;
+  const word = pickWord(null);
+  await update(roomRef, {
+    state: 'round',
+    currentRound: 1,
+    totalRounds: rounds,
+    secsPerRound: secs,
+    currentWord: word,
+    roundStartTime: Date.now(),
+    submissions: null,
+  });
+};
+
+function renderRound(data) {
+  showScreen('game');
+  hasAnswered = false;
+  clearInterval(timerInterval);
+  document.getElementById('word-input').value = '';
+  document.getElementById('word-input').classList.remove('shake','correct-flash');
+  document.getElementById('word-input').disabled = false;
+  document.getElementById('error-msg').textContent = '';
+
+  const word = data.currentWord || '—';
+  const startLetter = getStartLetter(word);
+  const length = word.length;
+  roundStartTime = data.roundStartTime || Date.now();
+  gameSettings.secs = data.secsPerRound || 30;
+  gameSettings.rounds = data.totalRounds || 8;
+
+  document.getElementById('current-word').textContent = word;
+  document.getElementById('word-rule').innerHTML = `Start with <em>${startLetter}</em> · Length <em>${length}</em>`;
+  document.getElementById('round-tag').textContent = `ROUND ${data.currentRound} / ${data.totalRounds}`;
+  document.getElementById('host-round-ctrl').style.display = isHost ? '' : 'none';
+
+  // Render feed
+  renderFeed(data.submissions || {});
+
+  // Start countdown
+  const elapsed = Math.floor((Date.now() - roundStartTime) / 1000);
+  let remaining = Math.max(0, gameSettings.secs - elapsed);
+  const tEl = document.getElementById('t-num');
+  tEl.textContent = remaining;
+  tEl.className = 't-num' + (remaining <= 10 ? ' urgent' : '');
+  timerInterval = setInterval(() => {
+    remaining--;
+    tEl.textContent = remaining;
+    tEl.className = 't-num' + (remaining <= 10 ? ' urgent' : '');
+    if (remaining <= 0) { clearInterval(timerInterval); if (isHost) endRound(); }
+  }, 1000);
+}
+
+function renderFeed(subs) {
+  const list = document.getElementById('feed-list');
+  list.innerHTML = '';
+  Object.values(subs).sort((a,b) => b.pts - a.pts).forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'feed-item';
+    div.innerHTML = `<span class="fi-word">${s.word}</span><span class="fi-name">${s.name}</span><span class="fi-pts">+${s.pts}</span>`;
+    list.appendChild(div);
+  });
+}
+
+window.submitWord = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (!data || data.state !== 'round') return;
+  if (hasAnswered) { showToast('Already answered this round'); return; }
+
+  const input = document.getElementById('word-input');
+  const val = input.value.trim().toUpperCase();
+  const word = data.currentWord.toUpperCase();
+  const required = { letter: getStartLetter(word), length: word.length };
+  const errorEl = document.getElementById('error-msg');
+
+  if (!val) return;
+  if (val.length !== required.length) {
+    errorEl.textContent = `Must be ${required.length} letters`;
+    input.classList.add('shake');
+    setTimeout(() => input.classList.remove('shake'), 400);
+    return;
+  }
+  if (val[0] !== required.letter) {
+    errorEl.textContent = `Must start with "${required.letter}"`;
+    input.classList.add('shake');
+    setTimeout(() => input.classList.remove('shake'), 400);
+    return;
+  }
+
+  // Check against simple word list (allow anything that looks like a real word)
+  const isValid = /^[A-Z]+$/.test(val);
+  if (!isValid) { errorEl.textContent = 'Letters only'; return; }
+
+  hasAnswered = true;
+  const elapsed = (Date.now() - roundStartTime) / 1000;
+  const pts = Math.max(100, Math.round(1000 - (elapsed / gameSettings.secs) * 600));
+  errorEl.textContent = '';
+  input.classList.add('correct-flash');
+  input.disabled = true;
+
+  const _room = document.getElementById('room-name').value.trim();
+  await update(ref(db, `wordchain/${_room}/submissions/${myId}`), { name: myName, word: val, pts, time: Date.now() });
+  showToast(`+${pts} pts!`);
+};
+
+// Handle Enter key
+document.getElementById('word-input').addEventListener('keydown', e => { if(e.key==='Enter') window.submitWord(); });
+
+window.endRound = async function() {
+  clearInterval(timerInterval);
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const subs = data.submissions || {};
+  const scores = data.scores || {};
+  Object.values(subs).forEach(s => { scores[s.name] = (scores[s.name] || 0) + s.pts; });
+  const nextRoundNum = (data.currentRound || 1) + 1;
+  if (nextRoundNum > (data.totalRounds || 8)) {
+    await update(roomRef, { state: 'final', scores });
+  } else {
+    await update(roomRef, { state: 'scoreboard', scores });
+  }
+};
+
+window.nextRound = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const lastWord = data.currentWord || '';
+  const startLetter = getStartLetter(lastWord);
+  const newWord = pickWord(null);
+  await update(roomRef, {
+    state: 'round',
+    currentRound: (data.currentRound || 1) + 1,
+    currentWord: newWord,
+    roundStartTime: Date.now(),
+    submissions: null,
+  });
+};
+
+function showScoreScreen(data) {
+  showScreen('score');
+  clearInterval(timerInterval);
+  renderScoreList(data.scores || {}, 'score-list');
+}
+
+function renderScoreList(scores, elId) {
+  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+  const max = sorted[0]?.[1] || 1;
+  const list = document.getElementById(elId);
+  list.innerHTML = '';
+  sorted.forEach(([name, pts], i) => {
+    const div = document.createElement('div');
+    div.className = 'score-item';
+    const rankCls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    div.innerHTML = `
+      <div class="score-rank ${rankCls}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+      <div class="score-bar-wrap"><div class="score-name">${name}</div><div class="score-bar"><div class="score-bar-fill" style="width:${pts/max*100}%"></div></div></div>
+      <div class="score-pts">${pts}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function showFinalScreen(data) {
+  showScreen('final');
+  clearInterval(timerInterval);
+  const scores = data.scores || {};
+  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
+  const podium = document.getElementById('podium');
+  podium.innerHTML = '';
+  const order = [1,0,2];
+  const heights = ['podium-2','podium-1','podium-3'];
+  const medals = ['🥈','🥇','🥉'];
+  order.forEach((pos, i) => {
+    const [name, pts] = sorted[pos] || ['—', 0];
+    const col = document.createElement('div');
+    col.className = 'podium-col';
+    col.innerHTML = `<div class="podium-name">${name}</div><div class="podium-pts">${pts}</div><div class="podium-block ${heights[i]}">${medals[i]}</div>`;
+    podium.appendChild(col);
+  });
+  renderScoreList(scores, 'final-score-list');
+}
+
+window.playAgain = async function() {
+  isHost = false;
+  document.getElementById('host-settings').style.display = 'none';
+  document.getElementById('wait-msg').style.display = '';
+  document.getElementById('host-claimed-msg').style.display = 'none';
+  document.getElementById('claim-host-btn').style.display = '';
+  document.getElementById('lobby-reset-btn').style.display = 'none';
+  await update(roomRef, { state: 'lobby', submissions: null, scores: null, currentRound: 1, hostId: null });
+};
+
+window.showResetDialog = function() {
+  document.getElementById('reset-overlay').classList.add('show');
+};
+window.closeResetDialog = function() {
+  document.getElementById('reset-overlay').classList.remove('show');
+};
+window.confirmReset = async function() {
+  document.getElementById('reset-overlay').classList.remove('show');
+  if (!db) {
+    const fbUrl = document.getElementById('fb-url').value.trim();
+    const room = document.getElementById('room-name').value.trim();
+    try {
+      const { initializeApp: ia } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getDatabase: gd, ref: r } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      const app = ia({ databaseURL: fbUrl }, 'wc-reset-' + Date.now());
+      db = gd(app);
+      roomRef = r(db, 'wordchain/' + room);
+    } catch(e) { showToast('Could not connect to reset'); return; }
+  }
+  try {
+    const { remove } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+    await remove(roomRef);
+    isHost = false;
+    document.getElementById('host-settings').style.display = 'none';
+    document.getElementById('host-claimed-msg').style.display = 'none';
+    document.getElementById('lobby-reset-btn').style.display = 'none';
+    document.getElementById('claim-host-btn').style.display = '';
+    document.getElementById('status-bar').textContent = 'Not connected';
+    showScreen('setup');
+    showToast('Game reset — ready for a fresh start!');
+  } catch(e) { showToast('Reset failed: ' + e.message); }
+};
+
+function showScreen(name) {
+  currentScreen = name;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+</script>
+</body>
+</html>
