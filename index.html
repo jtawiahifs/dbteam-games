@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Team Game Zone</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #080808;
+    --off-black: #111111;
+    --card-bg: #161616;
+    --border: #272727;
+    --white: #f5f5f5;
+    --off-white: #aaaaaa;
+    --trivia-accent: #00e676;
+    --chain-accent: #7dd3fc;
+    --codes-accent: #e83a3a;
+    --glow-trivia: rgba(0,230,118,.18);
+    --glow-chain: rgba(125,211,252,.18);
+    --glow-codes: rgba(232,58,58,.18);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ─────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── SCANLINE OVERLAY ────────────────────────────────── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,.04) 2px,
+      rgba(0,0,0,.04) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px 80px;
+  }
+
+  /* ── HERO ────────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    margin-bottom: 72px;
+    animation: fadeUp .8s ease both;
+  }
+
+  .hero-eyebrow {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--off-white);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .hero-eyebrow::before,
+  .hero-eyebrow::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(3.2rem, 10vw, 7rem);
+    line-height: .92;
+    letter-spacing: 2px;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .hero-title .highlight-green { color: var(--trivia-accent); }
+  .hero-title .highlight-blue  { color: var(--chain-accent); }
+  .hero-title .highlight-red   { color: var(--codes-accent); }
+
+  .hero-sub {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: clamp(1.1rem, 3vw, 1.6rem);
+    font-weight: 400;
+    color: var(--off-white);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 14px;
+  }
+
+  /* decorative divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 36px auto 0;
+    width: 260px;
+  }
+  .divider span { flex: 1; height: 1px; background: var(--border); }
+  .divider em {
+    font-style: normal;
+    font-size: 0.7rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--off-white);
+    white-space: nowrap;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  /* ── GAME CARDS GRID ─────────────────────────────────── */
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    max-width: 1060px;
+  }
+
+  .game-card {
+    position: relative;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px 28px 32px;
+    text-decoration: none;
+    color: var(--white);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    animation: fadeUp .8s ease both;
+    overflow: hidden;
+  }
+
+  .game-card:nth-child(1) { animation-delay: .1s; }
+  .game-card:nth-child(2) { animation-delay: .22s; }
+  .game-card:nth-child(3) { animation-delay: .34s; }
+
+  /* hover lift + glow per card */
+  .game-card.trivia:hover  { transform: translateY(-6px); border-color: var(--trivia-accent); box-shadow: 0 20px 60px var(--glow-trivia); }
+  .game-card.chain:hover   { transform: translateY(-6px); border-color: var(--chain-accent);  box-shadow: 0 20px 60px var(--glow-chain); }
+  .game-card.codes:hover   { transform: translateY(-6px); border-color: var(--codes-accent);  box-shadow: 0 20px 60px var(--glow-codes); }
+
+  /* corner accent bar */
+  .game-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+  }
+  .game-card.trivia::before { background: var(--trivia-accent); }
+  .game-card.chain::before  { background: var(--chain-accent); }
+  .game-card.codes::before  { background: var(--codes-accent); }
+
+  /* large background number */
+  .game-card::after {
+    content: attr(data-num);
+    position: absolute;
+    bottom: -10px; right: 16px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 7rem;
+    opacity: .04;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  /* icon container */
+  .card-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .trivia  .card-icon { background: rgba(0,230,118,.1); border: 1px solid rgba(0,230,118,.25); }
+  .chain   .card-icon { background: rgba(125,211,252,.1); border: 1px solid rgba(125,211,252,.25); }
+  .codes   .card-icon { background: rgba(232,58,58,.1); border: 1px solid rgba(232,58,58,.25); }
+
+  .card-body { flex: 1; }
+
+  .card-tag {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .trivia .card-tag { color: var(--trivia-accent); }
+  .chain  .card-tag { color: var(--chain-accent); }
+  .codes  .card-tag { color: var(--codes-accent); }
+
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.1rem;
+    letter-spacing: 2px;
+    line-height: 1;
+    margin-bottom: 10px;
+    color: var(--white);
+  }
+
+  .card-desc {
+    font-size: 0.88rem;
+    color: var(--off-white);
+    line-height: 1.6;
+    font-weight: 400;
+  }
+
+  .card-cta {
+    margin-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 9px 18px;
+    border-radius: 8px;
+    transition: opacity .2s;
+    align-self: flex-start;
+  }
+  .trivia .card-cta { background: rgba(0,230,118,.12); color: var(--trivia-accent); border: 1px solid rgba(0,230,118,.3); }
+  .chain  .card-cta { background: rgba(125,211,252,.12); color: var(--chain-accent); border: 1px solid rgba(125,211,252,.3); }
+  .codes  .card-cta { background: rgba(232,58,58,.12); color: var(--codes-accent); border: 1px solid rgba(232,58,58,.3); }
+  .card-cta:hover { opacity: .75; }
+
+  .card-cta svg { flex-shrink: 0; }
+
+  /* ── FOOTER ──────────────────────────────────────────── */
+  .footer {
+    margin-top: 72px;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--border);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Barlow Condensed', sans-serif;
+    animation: fadeUp .8s .5s ease both;
+  }
+
+  /* ── ANIMATIONS ──────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── RESPONSIVE ──────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .games-grid { grid-template-columns: 1fr; max-width: 480px; }
+    .hero-title { font-size: clamp(2.8rem, 12vw, 4.5rem); }
+  }
+  @media (min-width: 861px) and (max-width: 1060px) {
+    .games-grid { grid-template-columns: 1fr 1fr; max-width: 700px; }
+    .game-card:last-child { grid-column: 1 / -1; max-width: 340px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">Database Services Team</div>
+    <h1 class="hero-title">
+      <span class="highlight-green">Welcome</span> to the<br>
+      <span class="highlight-blue">DB</span> Team
+      <span class="highlight-red">Game</span> Zone
+    </h1>
+    <p class="hero-sub">Pick a game &amp; let the challenge begin</p>
+    <div class="divider">
+      <span></span>
+      <em>3 Games Available</em>
+      <span></span>
+    </div>
+  </div>
+
+  <!-- GAME CARDS -->
+  <div class="games-grid">
+
+    <!-- Team Trivia -->
+    <a class="game-card trivia"
+       href="https://jtawiahifs.github.io/dbteam-games/team-trivia.html"
+       target="_blank"
+       data-num="01">
+      <div class="card-icon">
+        <!-- Books SVG -->
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="24" width="30" height="5.5" rx="1.8" fill="#00e676" opacity="0.9"/>
+          <rect x="4" y="16.5" width="26" height="6.5" rx="1.8" fill="#00e676" opacity="0.72"/>
+          <rect x="6" y="10" width="22" height="5.5" rx="1.8" fill="#00e676" opacity="0.55"/>
+          <rect x="8" y="5" width="18" height="4.5" rx="1.8" fill="#00e676" opacity="0.38"/>
+          <rect x="5.5" y="16.5" width="2.5" height="6.5" rx="1.2" fill="#080808" opacity="0.35"/>
+          <rect x="7.5" y="10" width="2.5" height="5.5" rx="1.2" fill="#080808" opacity="0.35"/>
+          <rect x="9.5" y="5" width="2.5" height="4.5" rx="1.2" fill="#080808" opacity="0.35"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-tag">Quiz Game</div>
+        <div class="card-title">DB Team Trivia</div>
+        <p class="card-desc">Test your knowledge across General Knowledge, Science, IT, Azure Cloud, Oracle GoldenGate, Databases and more. 485 questions across 10 categories.</p>
+      </div>
+      <div class="card-cta">
+        Play Now
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- Word Chain -->
+    <a class="game-card chain"
+       href="https://jtawiahifs.github.io/dbteam-games/word-chain.html"
+       target="_blank"
+       data-num="02">
+      <div class="card-icon">
+        <!-- Chain link SVG -->
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Left link -->
+          <rect x="2" y="11" width="14" height="7" rx="3.5" fill="none" stroke="#7dd3fc" stroke-width="2.5"/>
+          <rect x="4.5" y="13.5" width="9" height="2" rx="1" fill="#161616"/>
+          <!-- Right link -->
+          <rect x="20" y="11" width="14" height="7" rx="3.5" fill="none" stroke="#7dd3fc" stroke-width="2.5"/>
+          <rect x="22.5" y="13.5" width="9" height="2" rx="1" fill="#161616"/>
+          <!-- Overlap connector -->
+          <rect x="15" y="13.5" width="6" height="2" rx="1" fill="#7dd3fc" opacity="0.7"/>
+          <!-- Letter bubbles below -->
+          <circle cx="7" cy="27" r="4" fill="#1f3a5a" stroke="#7dd3fc" stroke-width="1.5"/>
+          <circle cx="18" cy="27" r="4" fill="#1f3a5a" stroke="#38bdf8" stroke-width="1.5"/>
+          <circle cx="29" cy="27" r="4" fill="#1f3a5a" stroke="#7dd3fc" stroke-width="1.5"/>
+          <text x="7" y="30" font-family="monospace" font-size="5" font-weight="700" text-anchor="middle" fill="#7dd3fc">A</text>
+          <text x="18" y="30" font-family="monospace" font-size="5" font-weight="700" text-anchor="middle" fill="#38bdf8">→</text>
+          <text x="29" y="30" font-family="monospace" font-size="5" font-weight="700" text-anchor="middle" fill="#7dd3fc">E</text>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-tag">Word Game</div>
+        <div class="card-title">DB Team Word Chain</div>
+        <p class="card-desc">A word appears — type a word that starts with its last letter and matches its length. Fastest correct answer scores the most. Speed is everything.</p>
+      </div>
+      <div class="card-cta">
+        Play Now
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+    <!-- Codenames -->
+    <a class="game-card codes"
+       href="https://jtawiahifs.github.io/dbteam-games/codenames.html"
+       target="_blank"
+       data-num="03">
+      <div class="card-icon">
+        <!-- Spy + magnifying glass SVG -->
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Hat brim -->
+          <ellipse cx="16" cy="10" rx="10" ry="3" fill="#2a0a0a" stroke="#e83a3a" stroke-width="1.2"/>
+          <!-- Hat top -->
+          <rect x="10" y="3" width="12" height="8" rx="2" fill="#2a0a0a" stroke="#e83a3a" stroke-width="1.2"/>
+          <!-- Hat band -->
+          <rect x="10" y="9" width="12" height="2" fill="#e83a3a"/>
+          <!-- Head -->
+          <circle cx="16" cy="17" r="6" fill="#f0f0f0"/>
+          <!-- Eyes squint -->
+          <ellipse cx="13.5" cy="17" rx="2" ry="1.2" fill="#222"/>
+          <ellipse cx="18.5" cy="17" rx="2" ry="1.2" fill="#222"/>
+          <!-- Body coat -->
+          <path d="M8 34 Q8 26 16 24 Q24 26 24 34Z" fill="#1e1e1e" stroke="#2e2e2e" stroke-width="1"/>
+          <!-- Lapels -->
+          <path d="M12 24 L16 29 L20 24" fill="none" stroke="#e83a3a" stroke-width="1.5"/>
+          <!-- Magnifying glass -->
+          <circle cx="29" cy="24" r="5.5" fill="none" stroke="#e83a3a" stroke-width="2"/>
+          <line x1="33" y1="28" x2="36" y2="31" stroke="#e83a3a" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-tag">Team Strategy</div>
+        <div class="card-title">DB Team Code Names</div>
+        <p class="card-desc">Two teams compete to find their secret words on a 5×5 grid. Your Spymaster drops one-word clues. One wrong move hits the Assassin and it's all over.</p>
+      </div>
+      <div class="card-cta">
+        Play Now
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </a>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">Database Services Team &nbsp;·&nbsp; Game Zone &nbsp;·&nbsp; Have Fun! 🎮</div>
+
+</div>
+</body>
+</html>
