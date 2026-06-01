@@ -359,6 +359,71 @@
   .text-muted { color: var(--muted); font-size: 0.82rem; }
   .text-center { text-align: center; }
 
+  /* Word source toggle */
+  .word-mode-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .wm-btn {
+    flex: 1;
+    padding: 9px 12px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    text-align: center;
+  }
+  .wm-btn.active {
+    background: var(--accent);
+    color: #0a0514;
+  }
+  .wm-btn:not(.active):hover { background: var(--surface2); color: var(--ink); }
+  .custom-words-area {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+    margin-bottom: 14px;
+  }
+  .custom-words-area.visible { display: flex; }
+  .custom-words-area textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    padding: 10px 12px;
+    resize: vertical;
+    min-height: 130px;
+    outline: none;
+    width: 100%;
+    line-height: 1.6;
+    transition: border-color .2s;
+  }
+  .custom-words-area textarea:focus { border-color: var(--accent); }
+  .word-count-badge {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: right;
+    font-family: 'Space Mono', monospace;
+  }
+  .word-count-badge.warn { color: var(--accent); }
+  .word-source-info {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
   @media(max-width:600px) {
     .settings-row { grid-template-columns: 1fr; }
     .podium-block { width: 80px; }
@@ -588,7 +653,31 @@
         <input type="number" id="setting-secs" min="15" max="60" value="30">
       </div>
     </div>
-    <button class="btn btn-primary w100" onclick="startGame()">Start Game</button>
+
+    <div class="input-group" style="margin-bottom:8px">
+      <label>Word Source</label>
+    </div>
+    <div class="word-mode-toggle">
+      <button class="wm-btn active" id="wm-builtin" onclick="setWordMode('builtin')">🎲 Built-in Words</button>
+      <button class="wm-btn" id="wm-custom" onclick="setWordMode('custom')">✏️ My Custom Words</button>
+    </div>
+
+    <!-- Built-in info -->
+    <div id="builtin-info" class="word-source-info">
+      Uses a built-in bank of 200+ words, randomly selected each round. Words vary in length — players must match whatever length appears.
+    </div>
+
+    <!-- Custom words area -->
+    <div class="custom-words-area" id="custom-words-area">
+      <div class="word-source-info">
+        Enter one word per line. Words can be any length — each round players must respond with a word that starts with the last letter and matches that round's word length. Minimum 5 words needed.
+      </div>
+      <textarea id="custom-words-input" placeholder="Enter one word per line, e.g:&#10;APPLE&#10;REPLICATION&#10;INDEX&#10;CLOUD&#10;QUERY&#10;DATABASE" oninput="updateWordCount()"></textarea>
+      <div class="word-count-badge" id="word-count-badge">0 words entered</div>
+      <div id="word-validation-msg" style="font-size:0.78rem;color:var(--accent);display:none"></div>
+    </div>
+
+    <button class="btn btn-primary w100" style="margin-top:6px" onclick="startGame()">Start Game</button>
   </div>
   <p class="text-muted text-center mt8" id="wait-msg" style="display:none">Waiting for host to start…</p>
 </div>
@@ -683,9 +772,59 @@ const WORDS = [
   'dwarf','flask','scout','trout','bland','clamp','grove','stunt','crave','drift',
 ];
 
-function pickWord(len) {
-  const pool = WORDS.filter(w => len ? w.length === len : true);
+function pickWord(len, customList) {
+  // Use custom list if provided and non-empty
+  const source = (customList && customList.length > 0) ? customList : WORDS;
+  const pool = source.filter(w => len ? w.length === len : true);
   return pool.length ? pool[Math.floor(Math.random() * pool.length)].toUpperCase() : null;
+}
+
+window.setWordMode = function(mode) {
+  const builtinBtn = document.getElementById('wm-builtin');
+  const customBtn = document.getElementById('wm-custom');
+  const builtinInfo = document.getElementById('builtin-info');
+  const customArea = document.getElementById('custom-words-area');
+  if (mode === 'builtin') {
+    builtinBtn.classList.add('active');
+    customBtn.classList.remove('active');
+    builtinInfo.style.display = '';
+    customArea.classList.remove('visible');
+  } else {
+    customBtn.classList.add('active');
+    builtinBtn.classList.remove('active');
+    builtinInfo.style.display = 'none';
+    customArea.classList.add('visible');
+  }
+};
+
+window.updateWordCount = function() {
+  const raw = document.getElementById('custom-words-input').value;
+  const words = parseCustomWords(raw);
+  const badge = document.getElementById('word-count-badge');
+  const msg = document.getElementById('word-validation-msg');
+  badge.textContent = `${words.length} word${words.length !== 1 ? 's' : ''} entered`;
+  badge.className = 'word-count-badge' + (words.length < 5 && words.length > 0 ? ' warn' : '');
+  if (words.length >= 2) {
+    const lengths = [...new Set(words.map(w => w.length))];
+    const minL = Math.min(...lengths);
+    const maxL = Math.max(...lengths);
+    msg.textContent = `✓ ${words.length} words · lengths range from ${minL} to ${maxL} letters`;
+    msg.style.display = '';
+    msg.style.color = '#3ecf6e';
+  } else {
+    msg.style.display = 'none';
+  }
+};
+
+function parseCustomWords(raw) {
+  return raw.split('\n')
+    .map(w => w.trim().toUpperCase())
+    .filter(w => w.length > 0 && /^[A-Z]+$/.test(w));
+}
+
+function getCustomWordList() {
+  const raw = document.getElementById('custom-words-input')?.value || '';
+  return parseCustomWords(raw);
 }
 
 function getStartLetter(word) { return word.slice(-1).toUpperCase(); }
@@ -771,7 +910,19 @@ function renderPlayers(players, hostId) {
 window.startGame = async function() {
   const rounds = parseInt(document.getElementById('setting-rounds').value) || 8;
   const secs = parseInt(document.getElementById('setting-secs').value) || 30;
-  const word = pickWord(null);
+  const isCustomMode = document.getElementById('wm-custom')?.classList.contains('active');
+
+  let customWords = [];
+  if (isCustomMode) {
+    customWords = getCustomWordList();
+    if (customWords.length < 5) {
+      showToast('Add at least 5 words to use custom mode'); return;
+    }
+  }
+
+  const wordPool = isCustomMode ? customWords : null;
+  const word = pickWord(null, wordPool);
+
   await update(roomRef, {
     state: 'round',
     currentRound: 1,
@@ -780,6 +931,8 @@ window.startGame = async function() {
     currentWord: word,
     roundStartTime: Date.now(),
     submissions: null,
+    customWords: isCustomMode ? customWords : null,
+    usingCustomWords: isCustomMode,
   });
 };
 
@@ -801,7 +954,8 @@ function renderRound(data) {
 
   document.getElementById('current-word').textContent = word;
   document.getElementById('word-rule').innerHTML = `Start with <em>${startLetter}</em> · Length <em>${length}</em>`;
-  document.getElementById('round-tag').textContent = `ROUND ${data.currentRound} / ${data.totalRounds}`;
+  const sourceTag = data.usingCustomWords ? ' · CUSTOM' : '';
+  document.getElementById('round-tag').textContent = `ROUND ${data.currentRound} / ${data.totalRounds}${sourceTag}`;
   document.getElementById('host-round-ctrl').style.display = isHost ? '' : 'none';
 
   // Render feed
@@ -895,9 +1049,10 @@ window.endRound = async function() {
 window.nextRound = async function() {
   const snap = await get(roomRef);
   const data = snap.val();
-  const lastWord = data.currentWord || '';
-  const startLetter = getStartLetter(lastWord);
-  const newWord = pickWord(null);
+  const customWords = data.usingCustomWords && data.customWords
+    ? Object.values(data.customWords)
+    : null;
+  const newWord = pickWord(null, customWords);
   await update(roomRef, {
     state: 'round',
     currentRound: (data.currentRound || 1) + 1,
