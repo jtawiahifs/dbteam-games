@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Doodle Dash</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --border: #1e4080;
+  --red: #e94560;
+  --blue: #0f9cf5;
+  --red-dim: rgba(233,69,96,.15);
+  --blue-dim: rgba(15,156,245,.15);
+  --yellow: #ffd700;
+  --green: #06d6a0;
+  --orange: #ff6b35;
+  --text: #f0f4ff;
+  --muted: #7b8cbe;
+  --canvas-bg: #fafafa;
+  --radius: 12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden;}
+
+/* BACKGROUND STARS */
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(15,156,245,.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(233,69,96,.08) 0%,transparent 60%);pointer-events:none;z-index:0;}
+
+/* HEADER */
+header{width:100%;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-bottom:2px solid var(--border);position:relative;z-index:10;}
+.logo{font-family:'Fredoka One',cursive;font-size:1.6rem;letter-spacing:1px;color:var(--yellow);display:flex;align-items:center;gap:10px;}
+.logo .logo-db{color:var(--text);}
+#status-bar{font-size:0.72rem;color:var(--muted);background:var(--surface2);padding:6px 14px;border-radius:8px;border:1px solid var(--border);text-align:right;line-height:1.6;}
+#status-bar .sb-name{color:var(--text);font-weight:800;display:block;}
+#status-bar .sb-role{font-size:0.65rem;letter-spacing:1px;text-transform:uppercase;display:block;}
+#status-bar .sb-role.host{color:var(--yellow);}
+#status-bar .sb-role.drawer{color:var(--orange);}
+#status-bar .sb-role.guesser.red{color:var(--red);}
+#status-bar .sb-role.guesser.blue{color:var(--blue);}
+
+/* SCREENS */
+.screen{display:none;width:100%;max-width:960px;padding:24px 16px;position:relative;z-index:1;}
+.screen.active{display:flex;flex-direction:column;align-items:center;gap:16px;}
+
+/* SETUP */
+.setup-hero{text-align:center;padding:20px 0 8px;}
+.setup-hero .pencil-icon{font-size:5rem;animation:bounce 2s infinite;}
+@keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);};}
+.setup-hero h1{font-family:'Fredoka One',cursive;font-size:3rem;letter-spacing:2px;color:var(--yellow);margin:10px 0 4px;}
+.setup-hero p{color:var(--muted);font-size:0.9rem;}
+.setup-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:460px;}
+.ig{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.ig label{font-size:0.72rem;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+input[type=text],input[type=url],input[type=number],textarea,select{background:var(--surface2);border:2px solid var(--border);border-radius:8px;color:var(--text);font-family:'Nunito',sans-serif;font-size:0.95rem;font-weight:700;padding:11px 14px;outline:none;transition:border-color .2s;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:var(--yellow);}
+textarea{resize:vertical;min-height:100px;line-height:1.6;}
+.btn{cursor:pointer;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.95rem;padding:12px 22px;transition:all .15s;}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.1);}
+.btn:active{transform:none;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-primary{background:var(--yellow);color:#1a1a2e;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-blue{background:var(--blue);color:#fff;}
+.btn-secondary{background:var(--surface2);color:var(--text);border:2px solid var(--border);}
+.btn-danger{background:#e94560;color:#fff;}
+.btn-sm{padding:7px 14px;font-size:0.82rem;}
+.w100{width:100%;}
+.flex-row{display:flex;align-items:center;gap:10px;}
+.flex-sb{display:flex;align-items:center;justify-content:space-between;}
+.mt8{margin-top:8px;}
+.mt16{margin-top:16px;}
+.text-muted{color:var(--muted);font-size:0.82rem;}
+.text-center{text-align:center;}
+
+/* LOBBY */
+.lobby-title{font-family:'Fredoka One',cursive;font-size:2.6rem;letter-spacing:2px;color:var(--yellow);text-align:center;}
+.room-badge{display:inline-block;background:var(--surface2);border:2px solid var(--border);border-radius:20px;padding:4px 14px;font-size:0.75rem;color:var(--muted);font-weight:700;}
+.teams-grid{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.team-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:18px;}
+.team-card.red{border-top:4px solid var(--red);}
+.team-card.blue{border-top:4px solid var(--blue);}
+.team-title{font-family:'Fredoka One',cursive;font-size:1.1rem;letter-spacing:1px;margin-bottom:12px;}
+.team-title.red{color:var(--red);}
+.team-title.blue{color:var(--blue);}
+.player-list{display:flex;flex-direction:column;gap:6px;min-height:50px;}
+.player-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:0.88rem;font-weight:700;}
+.player-row .host-badge{font-size:0.65rem;background:rgba(255,215,0,.15);color:var(--yellow);border:1px solid rgba(255,215,0,.3);border-radius:4px;padding:2px 7px;font-weight:700;letter-spacing:1px;}
+.host-settings{width:100%;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;}
+.host-settings h3{font-family:'Fredoka One',cursive;font-size:1rem;color:var(--yellow);letter-spacing:1px;margin-bottom:14px;}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;}
+.word-mode-toggle{display:flex;gap:0;border:2px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.wm-btn{flex:1;padding:9px 12px;background:none;border:none;color:var(--muted);font-family:'Nunito',sans-serif;font-size:0.82rem;font-weight:800;cursor:pointer;transition:background .15s,color .15s;text-align:center;}
+.wm-btn.active{background:var(--yellow);color:#1a1a2e;}
+.custom-area{display:none;flex-direction:column;gap:8px;margin-bottom:12px;}
+.custom-area.visible{display:flex;}
+.word-count{font-size:0.75rem;color:var(--muted);text-align:right;font-weight:700;}
+.lobby-actions{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;}
+
+/* GAME SCREEN */
+#game-screen{padding:14px;gap:10px;max-width:1100px;}
+.game-top{width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.score-pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:2px solid var(--border);border-radius:8px;padding:6px 14px;font-weight:800;font-size:0.85rem;}
+.score-pill .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.score-pill .dot.red{background:var(--red);}
+.score-pill .dot.blue{background:var(--blue);}
+.score-pill .num.red{color:var(--red);}
+.score-pill .num.blue{color:var(--blue);}
+.round-badge{background:var(--surface2);border:2px solid var(--border);border-radius:8px;padding:6px 14px;font-weight:800;font-size:0.85rem;color:var(--yellow);}
+.timer-pill{background:var(--surface);border:2px solid var(--border);border-radius:8px;padding:6px 16px;font-weight:900;font-size:1.1rem;min-width:60px;text-align:center;font-family:'Fredoka One',cursive;}
+.timer-pill.urgent{color:var(--red);border-color:var(--red);animation:pulse .5s infinite alternate;}
+@keyframes pulse{from{opacity:1;}to{opacity:.6;};}
+
+/* WORD DISPLAY */
+.word-reveal-panel{width:100%;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.word-for-drawer{font-family:'Fredoka One',cursive;font-size:2rem;color:var(--yellow);letter-spacing:3px;}
+.word-blanks{font-family:'Fredoka One',cursive;font-size:1.6rem;letter-spacing:6px;color:var(--muted);}
+.difficulty-tag{font-size:0.68rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;padding:4px 10px;border-radius:6px;}
+.difficulty-tag.easy{background:rgba(6,214,160,.15);color:var(--green);}
+.difficulty-tag.medium{background:rgba(255,107,53,.15);color:var(--orange);}
+.difficulty-tag.hard{background:rgba(233,69,96,.15);color:var(--red);}
+.hint-btn{cursor:pointer;background:rgba(255,215,0,.1);border:2px solid rgba(255,215,0,.3);border-radius:8px;color:var(--yellow);font-family:'Nunito',sans-serif;font-weight:800;font-size:0.78rem;padding:7px 14px;transition:all .15s;}
+.hint-btn:hover:not(:disabled){background:rgba(255,215,0,.2);}
+.hint-btn:disabled{opacity:.35;cursor:default;}
+
+/* CANVAS AREA */
+.canvas-wrap{width:100%;display:grid;grid-template-columns:1fr 280px;gap:12px;}
+.canvas-container{background:var(--canvas-bg);border:3px solid var(--border);border-radius:var(--radius);position:relative;overflow:hidden;cursor:crosshair;}
+canvas{display:block;touch-action:none;}
+.drawing-tools{display:flex;flex-direction:column;gap:8px;}
+.tool-panel{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:12px;}
+.tool-panel-title{font-size:0.65rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;}
+.color-swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s;}
+.color-swatch:hover{transform:scale(1.15);}
+.color-swatch.selected{border-color:var(--yellow);transform:scale(1.15);}
+.brush-row{display:flex;gap:6px;align-items:center;}
+.brush-btn{width:36px;height:36px;border-radius:8px;cursor:pointer;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;transition:border-color .15s;}
+.brush-btn:hover,.brush-btn.selected{border-color:var(--yellow);}
+.tool-row{display:flex;gap:6px;}
+.tool-btn{flex:1;padding:8px;border-radius:8px;cursor:pointer;background:var(--surface2);border:2px solid var(--border);color:var(--text);font-family:'Nunito',sans-serif;font-weight:800;font-size:0.78rem;transition:border-color .15s;text-align:center;}
+.tool-btn:hover,.tool-btn.selected{border-color:var(--yellow);color:var(--yellow);}
+.canvas-disabled-overlay{position:absolute;inset:0;background:rgba(26,26,46,.5);display:flex;align-items:center;justify-content:center;font-family:'Fredoka One',cursive;font-size:1.4rem;color:var(--muted);letter-spacing:1px;text-align:center;padding:20px;}
+
+/* GUESS BOX */
+.guess-panel{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;}
+.guess-feed{flex:1;padding:10px;display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;}
+.guess-item{font-size:0.85rem;font-weight:700;padding:7px 10px;border-radius:6px;}
+.guess-item.correct{background:rgba(6,214,160,.15);border:1px solid var(--green);color:var(--green);}
+.guess-item.wrong{background:var(--surface2);color:var(--muted);}
+.guess-item.system{color:var(--yellow);background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.2);}
+.guess-item .guesser-name{font-weight:900;}
+.guess-input-row{display:flex;gap:6px;padding:10px;border-top:2px solid var(--border);}
+.guess-input-row input{flex:1;}
+.guess-input-row .btn-primary{padding:10px 14px;}
+
+/* PENALTY / BONUS TOAST */
+.floating-point{position:fixed;pointer-events:none;font-family:'Fredoka One',cursive;font-size:1.8rem;font-weight:900;z-index:500;animation:floatUp 1.4s ease forwards;}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-80px);};}
+
+/* RATING OVERLAY */
+.rating-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:center;justify-content:center;}
+.rating-overlay.show{display:flex;}
+.rating-box{background:var(--surface);border:3px solid var(--yellow);border-radius:16px;padding:36px 44px;text-align:center;max-width:400px;width:90%;}
+.rating-box h2{font-family:'Fredoka One',cursive;font-size:1.8rem;color:var(--yellow);margin-bottom:8px;}
+.rating-box p{color:var(--muted);font-size:0.9rem;margin-bottom:22px;}
+.rating-stars{display:flex;justify-content:center;gap:12px;margin-bottom:24px;}
+.rating-star{font-size:3rem;cursor:pointer;transition:transform .15s;filter:grayscale(1) opacity(.4);}
+.rating-star:hover,.rating-star.selected{filter:none;transform:scale(1.2);}
+
+/* ROUND RESULT SCREEN */
+#result-screen .result-hero{text-align:center;margin-bottom:16px;}
+#result-screen .result-hero .word-revealed{font-family:'Fredoka One',cursive;font-size:2.5rem;color:var(--yellow);margin:10px 0;}
+#result-screen .result-hero .drawer-name{color:var(--muted);font-size:0.9rem;}
+.scoreboard{width:100%;display:flex;flex-direction:column;gap:8px;}
+.score-row{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:14px;}
+.score-row .rank-num{font-family:'Fredoka One',cursive;font-size:1.4rem;width:32px;text-align:center;}
+.score-row .rank-num.gold{color:var(--yellow);}
+.score-row .rank-num.silver{color:#c0c0c0;}
+.score-row .rank-num.bronze{color:#cd7f32;}
+.score-row .player-info{flex:1;}
+.score-row .player-name{font-weight:900;}
+.score-row .team-tag{font-size:0.68rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+.score-row .team-tag.red{color:var(--red);}
+.score-row .team-tag.blue{color:var(--blue);}
+.score-row .score-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:4px;}
+.score-row .score-bar-fill{height:100%;border-radius:3px;transition:width .6s;}
+.score-row .score-bar-fill.red{background:var(--red);}
+.score-row .score-bar-fill.blue{background:var(--blue);}
+.score-row .pts{font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--yellow);}
+.streak-badge{background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.3);border-radius:6px;padding:2px 8px;font-size:0.7rem;font-weight:800;color:var(--yellow);}
+
+/* FINAL SCREEN */
+#final-screen{gap:20px;}
+.final-banner{width:100%;background:var(--surface);border:3px solid var(--border);border-radius:16px;padding:32px;text-align:center;}
+.final-banner.red{border-color:var(--red);}
+.final-banner.blue{border-color:var(--blue);}
+.final-banner.draw{border-color:var(--muted);}
+.final-banner .trophy{font-size:4rem;margin-bottom:8px;}
+.final-banner h2{font-family:'Fredoka One',cursive;font-size:2.5rem;letter-spacing:2px;}
+.final-banner h2.red{color:var(--red);}
+.final-banner h2.blue{color:var(--blue);}
+.final-banner h2.draw{color:var(--muted);}
+.final-banner p{color:var(--muted);margin-top:8px;}
+.hall-of-fame{width:100%;background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:20px;}
+.hall-of-fame h3{font-family:'Fredoka One',cursive;font-size:1.2rem;color:var(--yellow);margin-bottom:14px;text-align:center;}
+.hof-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.hof-card{background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+.hof-card .hof-icon{font-size:2rem;margin-bottom:6px;}
+.hof-card .hof-label{font-size:0.65rem;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.hof-card .hof-winner{font-weight:900;font-size:1rem;color:var(--yellow);}
+.hof-card .hof-desc{font-size:0.78rem;color:var(--muted);margin-top:2px;}
+.player-teams{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.final-team-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);padding:18px;}
+.final-team-card.win{border-width:3px;}
+.final-team-card.win.red{border-color:var(--red);}
+.final-team-card.win.blue{border-color:var(--blue);}
+.final-team-title{font-family:'Fredoka One',cursive;font-size:1.1rem;margin-bottom:12px;}
+.final-team-title.red{color:var(--red);}
+.final-team-title.blue{color:var(--blue);}
+.final-player-row{display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:700;padding:6px 10px;background:var(--surface2);border-radius:6px;margin-bottom:6px;}
+
+/* RESET OVERLAY */
+.reset-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;align-items:center;justify-content:center;}
+.reset-overlay.show{display:flex;}
+.reset-box{background:var(--surface);border:2px solid var(--red);border-radius:var(--radius);padding:32px 36px;text-align:center;max-width:380px;width:90%;}
+.reset-box h3{font-family:'Fredoka One',cursive;font-size:1.6rem;color:var(--red);margin-bottom:10px;}
+.reset-box p{font-size:0.88rem;color:var(--muted);margin-bottom:22px;line-height:1.5;}
+
+/* TOAST */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface);border:2px solid var(--border);border-radius:8px;padding:11px 22px;font-size:0.9rem;font-weight:800;transition:transform .3s;z-index:400;pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+@media(max-width:700px){
+  .canvas-wrap{grid-template-columns:1fr;}
+  .teams-grid{grid-template-columns:1fr;}
+  .settings-grid{grid-template-columns:1fr 1fr;}
+  .hof-grid{grid-template-columns:1fr;}
+  .player-teams{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <rect x="2" y="24" width="28" height="5" rx="2" fill="#ffd700"/>
+      <rect x="4" y="14" width="6" height="12" rx="1" fill="#e94560"/>
+      <rect x="12" y="8" width="6" height="18" rx="1" fill="#0f9cf5"/>
+      <rect x="20" y="18" width="6" height="8" rx="1" fill="#06d6a0"/>
+    </svg>
+    <span class="logo-db">DB</span> Doodle Dash
+  </div>
+  <div id="status-bar">
+    <span class="sb-name" id="sb-name">Not connected</span>
+    <span class="sb-role" id="sb-role">—</span>
+  </div>
+</header>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" class="screen active">
+  <div class="setup-hero">
+    <div class="pencil-icon">✏️</div>
+    <h1>DB Doodle Dash!</h1>
+    <p>Draw fast. Guess faster. Win together.</p>
+  </div>
+  <div class="setup-card">
+    <div class="ig">
+      <label>Your Name</label>
+      <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
+    </div>
+    <button class="btn btn-primary w100" onclick="joinRoom()" style="margin-top:4px">Join Game →</button>
+    <p class="text-muted mt8">Anyone in the lobby can become the host.</p>
+    <hr style="border:none;border-top:2px solid var(--border);margin:18px 0">
+    <button class="btn btn-secondary w100" onclick="showResetDialog()" style="opacity:.7;font-size:0.85rem">🔄 Reset Previous Game</button>
+    <p class="text-muted mt8" style="font-size:0.75rem">Use this if the page is stuck on a previous game state.</p>
+  </div>
+  <input type="hidden" id="fb-url" value="https://doodle-dash-3ab8c-default-rtdb.firebaseio.com/">
+  <input type="hidden" id="room-name" value="doodle-room">
+</div>
+
+<!-- LOBBY SCREEN -->
+<div id="lobby-screen" class="screen">
+  <div style="text-align:center">
+    <div class="lobby-title">✏️ DB Doodle Dash</div>
+    <div class="room-badge" id="room-label" style="margin-top:8px">room: —</div>
+  </div>
+
+  <div class="teams-grid w100">
+    <div class="team-card red">
+      <div class="team-title red">🔴 Red Team</div>
+      <div class="player-list" id="red-list"><div style="color:var(--muted);font-size:.8rem">No players yet</div></div>
+      <div style="margin-top:10px">
+        <button class="btn btn-red btn-sm w100" id="join-red-btn" onclick="joinTeam('red')">Join Red</button>
+      </div>
+    </div>
+    <div class="team-card blue">
+      <div class="team-title blue">🔵 Blue Team</div>
+      <div class="player-list" id="blue-list"><div style="color:var(--muted);font-size:.8rem">No players yet</div></div>
+      <div style="margin-top:10px">
+        <button class="btn btn-blue btn-sm w100" id="join-blue-btn" onclick="joinTeam('blue')">Join Blue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Host settings -->
+  <div class="host-settings w100" id="host-settings" style="display:none">
+    <h3>⚙️ Game Settings</h3>
+    <div class="settings-grid">
+      <div class="ig">
+        <label>Rounds</label>
+        <input type="number" id="s-rounds" min="2" max="20" value="8">
+      </div>
+      <div class="ig">
+        <label>Draw time (sec)</label>
+        <select id="s-time">
+          <option value="45">45s — Fast!</option>
+          <option value="90" selected>90s — Standard</option>
+          <option value="120">120s — Relaxed</option>
+        </select>
+      </div>
+      <div class="ig">
+        <label>Difficulty</label>
+        <select id="s-difficulty">
+          <option value="all" selected>All levels</option>
+          <option value="easy">Easy only</option>
+          <option value="medium">Medium only</option>
+          <option value="hard">Hard only</option>
+        </select>
+      </div>
+    </div>
+    <div class="ig">
+      <label>Wrong guess penalty</label>
+      <select id="s-penalty">
+        <option value="0">No penalty</option>
+        <option value="25" selected>−25 pts per wrong guess</option>
+        <option value="50">−50 pts per wrong guess</option>
+      </select>
+    </div>
+    <div class="ig" style="margin-top:8px">
+      <label>Streak bonus (correct guesses in a row per team)</label>
+      <select id="s-streak">
+        <option value="0">No streak bonus</option>
+        <option value="3" selected>3 in a row = +150 bonus</option>
+        <option value="5">5 in a row = +300 bonus</option>
+      </select>
+    </div>
+
+    <div class="ig" style="margin-top:10px"><label>Word Source</label></div>
+    <div class="word-mode-toggle">
+      <button class="wm-btn active" id="wm-builtin" onclick="setWordMode('builtin')">🎲 Built-in Words</button>
+      <button class="wm-btn" id="wm-custom" onclick="setWordMode('custom')">✏️ My Custom Words</button>
+    </div>
+    <div class="custom-area" id="custom-area">
+      <p class="text-muted" style="font-size:0.78rem">One word per line. Optionally add difficulty with a colon: <strong>GOLDENGATE:hard</strong> or <strong>DOG:easy</strong>. Default difficulty is medium.</p>
+      <textarea id="custom-words-input" placeholder="REPLICATION:hard&#10;DATABASE:medium&#10;INDEX:easy&#10;GOLDENGATE:hard&#10;BLOB:medium" oninput="updateCustomCount()"></textarea>
+      <div class="word-count" id="custom-count">0 words</div>
+    </div>
+
+    <button class="btn btn-primary w100" id="start-btn" onclick="startGame()" disabled style="margin-top:10px">🎨 Start Drawing!</button>
+    <p class="text-muted mt8" id="start-warn" style="color:var(--red);display:none">Both teams need at least 1 player to start.</p>
+  </div>
+
+  <div style="text-align:center;margin-top:4px">
+    <button class="btn btn-secondary" id="claim-host-btn" onclick="claimHost()" style="display:none">👑 Become Host</button>
+    <p class="text-muted mt8" id="host-claimed-msg" style="display:none">You are the host ✓</p>
+    <button class="btn btn-secondary btn-sm" id="lobby-reset-btn" onclick="showResetDialog()" style="display:none;margin-top:10px;opacity:.7">🔄 Reset Game</button>
+  </div>
+  <p class="text-muted text-center" id="wait-msg" style="display:none">Waiting for host to start…</p>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div class="game-top w100">
+    <div class="round-badge" id="round-badge">Round 1/8</div>
+    <div class="score-pill"><span class="dot red"></span><span class="num red" id="red-score">0</span></div>
+    <div class="score-pill"><span class="dot blue"></span><span class="num blue" id="blue-score">0</span></div>
+    <div style="flex:1"></div>
+    <div class="timer-pill" id="timer-pill">90</div>
+  </div>
+
+  <div class="word-reveal-panel w100" id="word-panel">
+    <div>
+      <div class="word-for-drawer" id="word-for-drawer" style="display:none"></div>
+      <div class="word-blanks" id="word-blanks"></div>
+    </div>
+    <div class="flex-row">
+      <span class="difficulty-tag" id="diff-tag">medium</span>
+      <button class="hint-btn" id="hint-btn" onclick="useHint()" style="display:none">💡 Hint (−100pts)</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap w100">
+    <div class="canvas-container" id="canvas-container">
+      <canvas id="draw-canvas"></canvas>
+      <div class="canvas-disabled-overlay" id="canvas-overlay" style="display:none">👀 Watch &amp; Guess!</div>
+    </div>
+
+    <div class="drawing-tools" id="drawing-tools">
+      <div class="tool-panel">
+        <div class="tool-panel-title">Colour</div>
+        <div class="color-grid" id="color-grid"></div>
+      </div>
+      <div class="tool-panel">
+        <div class="tool-panel-title">Brush Size</div>
+        <div class="brush-row">
+          <button class="brush-btn selected" id="bs-small" onclick="setBrush(4,this)" title="Small">
+            <svg width="8" height="8"><circle cx="4" cy="4" r="3" fill="#f0f4ff"/></svg>
+          </button>
+          <button class="brush-btn" id="bs-med" onclick="setBrush(10,this)" title="Medium">
+            <svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#f0f4ff"/></svg>
+          </button>
+          <button class="brush-btn" id="bs-large" onclick="setBrush(20,this)" title="Large">
+            <svg width="24" height="24"><circle cx="12" cy="12" r="11" fill="#f0f4ff"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tool-panel">
+        <div class="tool-panel-title">Tools</div>
+        <div class="tool-row">
+          <button class="tool-btn selected" id="tool-pen" onclick="setTool('pen',this)">✏️ Draw</button>
+          <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser',this)">🧹 Erase</button>
+        </div>
+        <div class="tool-row" style="margin-top:6px">
+          <button class="tool-btn" onclick="clearCanvas()">🗑️ Clear</button>
+          <button class="tool-btn" onclick="fillCanvas()">🪣 Fill</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="guess-panel" id="guess-panel">
+      <div class="guess-feed" id="guess-feed"></div>
+      <div class="guess-input-row" id="guess-input-row">
+        <input type="text" id="guess-input" placeholder="Type your guess…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="btn btn-primary" onclick="submitGuess()">→</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ROUND RESULT SCREEN -->
+<div id="result-screen" class="screen">
+  <div class="result-hero w100">
+    <div style="font-size:2rem">🎨</div>
+    <div class="word-revealed" id="result-word"></div>
+    <div class="drawer-name" id="result-drawer"></div>
+  </div>
+  <div class="scoreboard w100" id="scoreboard"></div>
+  <div id="host-next-ctrl" style="display:none;margin-top:8px">
+    <button class="btn btn-primary" onclick="nextRound()">Next Round →</button>
+  </div>
+  <p class="text-muted text-center" id="result-wait-msg" style="display:none">Waiting for host…</p>
+</div>
+
+<!-- FINAL SCREEN -->
+<div id="final-screen" class="screen">
+  <div class="final-banner w100" id="final-banner">
+    <div class="trophy" id="final-trophy">🏆</div>
+    <h2 id="final-heading">RED WINS!</h2>
+    <p id="final-reason"></p>
+  </div>
+  <div class="hall-of-fame w100">
+    <h3>🏅 Hall of Fame</h3>
+    <div class="hof-grid" id="hof-grid"></div>
+  </div>
+  <div class="player-teams w100" id="final-teams"></div>
+  <button class="btn btn-primary" style="margin-top:8px" onclick="playAgain()">Play Again</button>
+</div>
+
+<!-- RATING OVERLAY -->
+<div class="rating-overlay" id="rating-overlay">
+  <div class="rating-box">
+    <h2>Rate the Drawing!</h2>
+    <p id="rating-prompt">How was the drawing?</p>
+    <div class="rating-stars" id="rating-stars">
+      <span class="rating-star" onclick="selectRating(1)">⭐</span>
+      <span class="rating-star" onclick="selectRating(2)">⭐</span>
+      <span class="rating-star" onclick="selectRating(3)">⭐</span>
+      <span class="rating-star" onclick="selectRating(4)">⭐</span>
+      <span class="rating-star" onclick="selectRating(5)">⭐</span>
+    </div>
+    <button class="btn btn-primary w100" id="rating-submit-btn" onclick="submitRating()" disabled>Submit Rating</button>
+  </div>
+</div>
+
+<!-- RESET OVERLAY -->
+<div class="reset-overlay" id="reset-overlay">
+  <div class="reset-box">
+    <h3>⚠️ Reset Game?</h3>
+    <p>This clears all players, scores and state. Everyone will be disconnected.</p>
+    <div class="flex-row" style="justify-content:center;gap:10px">
+      <button class="btn btn-danger" onclick="confirmReset()">Yes, Reset</button>
+      <button class="btn btn-secondary" onclick="closeResetDialog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, update, get, onValue, remove, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let db, roomRef, roomPath, myId, myName, myTeam=null, isHost=false, isDrawer=false;
+let timerInterval, currentScreen='setup', selectedRating=0;
+let canvas, ctx, drawing=false, brushSize=4, currentColor='#1a1a2e', currentTool='pen';
+let strokes=[], currentStroke=null;
+let wrongGuessCount=0, hasGuessedCorrectly=false;
+let redStreak=0, blueStreak=0;
+
+// ── WORD BANK ────────────────────────────────────────────────────────────────
+const WORD_BANK = [
+  // Easy
+  {w:'DOG',d:'easy'},{w:'CAT',d:'easy'},{w:'SUN',d:'easy'},{w:'CAR',d:'easy'},
+  {w:'TREE',d:'easy'},{w:'FISH',d:'easy'},{w:'BIRD',d:'easy'},{w:'HOUSE',d:'easy'},
+  {w:'STAR',d:'easy'},{w:'MOON',d:'easy'},{w:'CAKE',d:'easy'},{w:'BOOK',d:'easy'},
+  {w:'BALL',d:'easy'},{w:'RAIN',d:'easy'},{w:'BOAT',d:'easy'},{w:'FROG',d:'easy'},
+  {w:'APPLE',d:'easy'},{w:'PIZZA',d:'easy'},{w:'CLOCK',d:'easy'},{w:'SMILE',d:'easy'},
+  // Medium
+  {w:'LAPTOP',d:'medium'},{w:'BRIDGE',d:'medium'},{w:'ROCKET',d:'medium'},{w:'CASTLE',d:'medium'},
+  {w:'GUITAR',d:'medium'},{w:'PENGUIN',d:'medium'},{w:'VOLCANO',d:'medium'},{w:'PYRAMID',d:'medium'},
+  {w:'COMPASS',d:'medium'},{w:'LANTERN',d:'medium'},{w:'RAINBOW',d:'medium'},{w:'TORNADO',d:'medium'},
+  {w:'CACTUS',d:'medium'},{w:'ANCHOR',d:'medium'},{w:'MAGNET',d:'medium'},{w:'TROPHY',d:'medium'},
+  {w:'CANDLE',d:'medium'},{w:'SPIDER',d:'medium'},{w:'DIAMOND',d:'medium'},{w:'FEATHER',d:'medium'},
+  // Hard
+  {w:'DATABASE',d:'hard'},{w:'REPLICATION',d:'hard'},{w:'ALGORITHM',d:'hard'},{w:'FIREWALL',d:'hard'},
+  {w:'ENCRYPTION',d:'hard'},{w:'BANDWIDTH',d:'hard'},{w:'MIGRATION',d:'hard'},{w:'LATENCY',d:'hard'},
+  {w:'GOLDENGATE',d:'hard'},{w:'EXADATA',d:'hard'},{w:'FAILOVER',d:'hard'},{w:'CHECKPOINT',d:'hard'},
+  {w:'PIPELINE',d:'hard'},{w:'KUBERNETES',d:'hard'},{w:'SERVERLESS',d:'hard'},{w:'MICROSERVICE',d:'hard'},
+  {w:'INDEXING',d:'hard'},{w:'PARTITIONING',d:'hard'},{w:'THROUGHPUT',d:'hard'},{w:'ORCHESTRATION',d:'hard'},
+];
+
+const COLORS = ['#1a1a2e','#e94560','#0f9cf5','#ffd700','#06d6a0','#ff6b35',
+  '#ffffff','#888888','#ff69b4','#8b4513','#228b22','#4b0082',
+  '#ff8c00','#20b2aa','#dc143c','#00ced1','#ff1493','#7b68ee'];
+
+// ── CANVAS SETUP ─────────────────────────────────────────────────────────────
+function initCanvas() {
+  canvas = document.getElementById('draw-canvas');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', doDraw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); startDraw(e.touches[0]); }, {passive:false});
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); doDraw(e.touches[0]); }, {passive:false});
+  canvas.addEventListener('touchend', endDraw, {passive:false});
+  buildColorGrid();
+}
+
+function resizeCanvas() {
+  if (!canvas) return;
+  const container = document.getElementById('canvas-container');
+  const w = container.clientWidth;
+  const h = Math.min(w * 0.65, 420);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  canvas.width = w; canvas.height = h;
+  ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,w,h);
+  redrawStrokes();
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+}
+
+function startDraw(e) {
+  if (!isDrawer) return;
+  drawing = true;
+  const pos = getPos(e);
+  currentStroke = { color: currentTool==='eraser' ? '#fafafa' : currentColor, size: currentTool==='eraser' ? brushSize*3 : brushSize, points: [pos] };
+  ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+}
+function doDraw(e) {
+  if (!drawing || !isDrawer) return;
+  const pos = getPos(e);
+  currentStroke.points.push(pos);
+  ctx.lineWidth = currentStroke.size; ctx.strokeStyle = currentStroke.color;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const pts = currentStroke.points;
+  const l = pts.length;
+  if (l >= 2) { ctx.beginPath(); ctx.moveTo(pts[l-2].x, pts[l-2].y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+}
+async function endDraw() {
+  if (!drawing || !isDrawer || !currentStroke) return;
+  drawing = false;
+  strokes.push(currentStroke);
+  // Send stroke to Firebase (throttled — send last 5 strokes)
+  const strokesRef = ref(db, `${roomPath}/strokes`);
+  const key = Date.now().toString();
+  await update(ref(db, `${roomPath}/strokes/${key}`), {
+    color: currentStroke.color, size: currentStroke.size,
+    points: currentStroke.points.map(p => [Math.round(p.x), Math.round(p.y)])
+  });
+  currentStroke = null;
+}
+
+function redrawStrokes() {
+  if (!ctx) return;
+  ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  strokes.forEach(s => drawStroke(s));
+}
+
+function drawStroke(s) {
+  if (!s.points || s.points.length < 2) return;
+  ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = s.size; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.moveTo(s.points[0][0]||s.points[0].x, s.points[0][1]||s.points[0].y);
+  s.points.slice(1).forEach(p => ctx.lineTo(p[0]||p.x, p[1]||p.y));
+  ctx.stroke();
+}
+
+window.clearCanvas = async function() {
+  if (!isDrawer) return;
+  strokes = [];
+  ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  await remove(ref(db, `${roomPath}/strokes`));
+};
+window.fillCanvas = function() {
+  if (!isDrawer) return;
+  ctx.fillStyle = currentColor; ctx.fillRect(0,0,canvas.width,canvas.height);
+};
+
+function buildColorGrid() {
+  const grid = document.getElementById('color-grid');
+  COLORS.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (c===currentColor?' selected':'');
+    sw.style.background = c;
+    sw.style.border = c==='#ffffff' ? '2px solid #555' : '';
+    sw.onclick = () => { currentColor=c; document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected')); sw.classList.add('selected'); };
+    grid.appendChild(sw);
+  });
+}
+window.setBrush = function(size, btn) { brushSize=size; document.querySelectorAll('.brush-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); };
+window.setTool = function(tool, btn) { currentTool=tool; document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); };
+
+// ── JOIN / HOST ──────────────────────────────────────────────────────────────
+window.joinRoom = async function() {
+  const fbUrl = document.getElementById('fb-url').value.trim();
+  const room = document.getElementById('room-name').value.trim();
+  const name = document.getElementById('player-name').value.trim();
+  if (!name) { showToast('Enter your name first'); return; }
+  try {
+    const app = initializeApp({ databaseURL: fbUrl }, 'dd-' + Date.now());
+    db = getDatabase(app);
+    roomPath = 'doodle/' + room;
+    roomRef = ref(db, roomPath);
+    myName = name; myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    await update(ref(db, `${roomPath}/players/${myId}`), { name, joinedAt: Date.now(), team: null, score: 0 });
+    const snap = await get(roomRef);
+    if (!snap.val()?.state) await update(roomRef, { state: 'lobby' });
+    isHost = false;
+    document.getElementById('sb-name').textContent = name;
+    document.getElementById('sb-role').textContent = 'No team yet';
+    document.getElementById('wait-msg').style.display = '';
+    document.getElementById('claim-host-btn').style.display = '';
+    document.getElementById('room-label').textContent = `room: ${room}`;
+    showScreen('lobby');
+    subscribeRoom();
+    initCanvas();
+  } catch(e) { showToast('Connection failed: ' + e.message); }
+};
+
+window.claimHost = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data?.hostId && data.hostId !== myId) { showToast('Someone is already the host'); return; }
+  await update(roomRef, { hostId: myId });
+  becomeHost();
+};
+
+function becomeHost() {
+  isHost = true;
+  document.getElementById('host-settings').style.display = '';
+  document.getElementById('wait-msg').style.display = 'none';
+  document.getElementById('claim-host-btn').style.display = 'none';
+  document.getElementById('host-claimed-msg').style.display = '';
+  document.getElementById('lobby-reset-btn').style.display = '';
+  updateStatusBar();
+}
+
+window.joinTeam = async function(team) {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const me = data.players?.[myId];
+  if (me?.team) { showToast('You cannot switch teams mid-game'); return; }
+  const players = data.players || {};
+  const redCount = Object.values(players).filter(p=>p.team==='red').length;
+  const blueCount = Object.values(players).filter(p=>p.team==='blue').length;
+  if (team==='red' && redCount > blueCount+1) { showToast('Red is full — join Blue to balance teams'); return; }
+  if (team==='blue' && blueCount > redCount+1) { showToast('Blue is full — join Red to balance teams'); return; }
+  myTeam = team;
+  await update(ref(db, `${roomPath}/players/${myId}`), { team });
+  updateStatusBar();
+};
+
+// ── SUBSCRIBE ────────────────────────────────────────────────────────────────
+function subscribeRoom() {
+  onValue(roomRef, snap => {
+    const data = snap.val();
+    if (!data) return;
+    if (data.hostId === myId && !isHost) becomeHost();
+    const claimBtn = document.getElementById('claim-host-btn');
+    if (claimBtn && !isHost) {
+      const taken = data.hostId && data.hostId !== myId;
+      claimBtn.textContent = taken ? '👑 Host Taken' : '👑 Become Host';
+      claimBtn.disabled = taken;
+    }
+    const me = data.players?.[myId];
+    if (me) { myTeam = me.team; }
+    if (data.state==='lobby') renderLobby(data);
+    if (data.state==='drawing') renderDrawing(data);
+    if (data.state==='rating') showRatingOverlay(data);
+    if (data.state==='roundresult') showRoundResult(data);
+    if (data.state==='final') showFinalScreen(data);
+    // Sync strokes for guessers
+    if (data.state==='drawing' && !isDrawer) {
+      const fireStrokes = data.strokes ? Object.values(data.strokes) : [];
+      if (fireStrokes.length !== strokes.length) {
+        strokes = fireStrokes;
+        redrawStrokes();
+      }
+    }
+    updateStatusBar();
+  });
+}
+
+function renderLobby(data) {
+  showScreen('lobby');
+  const players = data.players || {};
+  const redPlayers = Object.entries(players).filter(([,p])=>p.team==='red');
+  const bluePlayers = Object.entries(players).filter(([,p])=>p.team==='blue');
+  const redCount = redPlayers.length, blueCount = bluePlayers.length;
+  document.getElementById('red-list').innerHTML = redPlayers.map(([id,p])=>`<div class="player-row">${p.name}${id===data.hostId?'<span class="host-badge">HOST</span>':''}</div>`).join('') || '<div style="color:var(--muted);font-size:.8rem">No players</div>';
+  document.getElementById('blue-list').innerHTML = bluePlayers.map(([id,p])=>`<div class="player-row">${p.name}${id===data.hostId?'<span class="host-badge">HOST</span>':''}</div>`).join('') || '<div style="color:var(--muted);font-size:.8rem">No players</div>';
+  const me = players[myId];
+  const joinRedBtn = document.getElementById('join-red-btn');
+  const joinBlueBtn = document.getElementById('join-blue-btn');
+  if (me?.team) { joinRedBtn.style.display='none'; joinBlueBtn.style.display='none'; }
+  else {
+    joinRedBtn.style.display=''; joinBlueBtn.style.display='';
+    joinRedBtn.textContent=`Join Red (${redCount})`;
+    joinBlueBtn.textContent=`Join Blue (${blueCount})`;
+    joinRedBtn.disabled = redCount > blueCount+1;
+    joinBlueBtn.disabled = blueCount > redCount+1;
+  }
+  if (isHost) {
+    const canStart = redCount >= 1 && blueCount >= 1;
+    document.getElementById('start-btn').disabled = !canStart;
+    document.getElementById('start-warn').style.display = canStart ? 'none' : '';
+  }
+}
+
+// ── GAME SETTINGS HELPERS ────────────────────────────────────────────────────
+window.setWordMode = function(mode) {
+  const isCustom = mode==='custom';
+  document.getElementById('wm-builtin').classList.toggle('active', !isCustom);
+  document.getElementById('wm-custom').classList.toggle('active', isCustom);
+  document.getElementById('custom-area').classList.toggle('visible', isCustom);
+};
+window.updateCustomCount = function() {
+  const words = parseCustomWords();
+  document.getElementById('custom-count').textContent = `${words.length} word${words.length!==1?'s':''}`;
+};
+function parseCustomWords() {
+  const raw = document.getElementById('custom-words-input').value;
+  return raw.split('\n').map(l=>l.trim()).filter(l=>l.length>0).map(l=>{
+    const parts = l.split(':');
+    const w = parts[0].trim().toUpperCase();
+    const d = ['easy','medium','hard'].includes(parts[1]?.trim().toLowerCase()) ? parts[1].trim().toLowerCase() : 'medium';
+    return {w, d};
+  }).filter(e=>e.w.length>0 && /^[A-Z\s]+$/.test(e.w));
+}
+
+function pickWords(settings, count) {
+  let pool;
+  if (settings.useCustom && settings.customWords?.length) {
+    pool = settings.customWords;
+  } else {
+    pool = WORD_BANK;
+  }
+  if (settings.difficulty !== 'all') pool = pool.filter(e=>e.d===settings.difficulty);
+  if (!pool.length) pool = WORD_BANK;
+  const shuffled = [...pool].sort(()=>Math.random()-.5);
+  return shuffled.slice(0, count);
+}
+
+// ── START GAME ───────────────────────────────────────────────────────────────
+window.startGame = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const players = data.players || {};
+  const redPlayers = Object.values(players).filter(p=>p.team==='red');
+  const bluePlayers = Object.values(players).filter(p=>p.team==='blue');
+  if (!redPlayers.length || !bluePlayers.length) { showToast('Both teams need players'); return; }
+
+  const rounds = parseInt(document.getElementById('s-rounds').value)||8;
+  const drawTime = parseInt(document.getElementById('s-time').value)||90;
+  const difficulty = document.getElementById('s-difficulty').value;
+  const penalty = parseInt(document.getElementById('s-penalty').value)||0;
+  const streakAt = parseInt(document.getElementById('s-streak').value)||0;
+  const isCustom = document.getElementById('wm-custom').classList.contains('active');
+  const customWords = isCustom ? parseCustomWords() : [];
+
+  const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom:isCustom, customWords };
+
+  // Build all players list rotating teams for drawing order
+  const allPlayers = Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+  const drawOrder = allPlayers.map(([id])=>id);
+
+  // Pick words
+  const words = pickWords(settings, rounds * drawOrder.length + 5);
+
+  const scores = {};
+  allPlayers.forEach(([id,p])=>{ scores[id] = { name:p.name, team:p.team, score:0, ratings:[], ratingsGiven:0 }; });
+
+  await update(roomRef, {
+    state:'drawing', settings, drawOrder, words: words.map((e,i)=>({...e,idx:i})),
+    currentRound:0, currentDrawerIdx:0,
+    scores, redTeamScore:0, blueTeamScore:0,
+    redStreak:0, blueStreak:0,
+    strokes:null, guesses:null, hintsUsed:0,
+  });
+};
+
+// ── RENDER DRAWING ROUND ─────────────────────────────────────────────────────
+function renderDrawing(data) {
+  showScreen('game');
+  clearInterval(timerInterval);
+  wrongGuessCount = 0; hasGuessedCorrectly = false;
+
+  const { settings, drawOrder, words, currentRound, currentDrawerIdx, scores, redTeamScore, blueTeamScore } = data;
+  const totalRounds = settings.rounds;
+  const drawerIdInOrder = drawOrder[currentDrawerIdx % drawOrder.length];
+  isDrawer = myId === drawerIdInOrder;
+  const word = words[currentRound] || words[0];
+
+  // Update UI
+  document.getElementById('round-badge').textContent = `Round ${currentRound+1}/${totalRounds}`;
+  document.getElementById('red-score').textContent = redTeamScore || 0;
+  document.getElementById('blue-score').textContent = blueTeamScore || 0;
+
+  const diffTag = document.getElementById('diff-tag');
+  diffTag.textContent = word.d; diffTag.className = `difficulty-tag ${word.d}`;
+
+  if (isDrawer) {
+    document.getElementById('word-for-drawer').style.display = '';
+    document.getElementById('word-for-drawer').textContent = word.w;
+    document.getElementById('word-blanks').style.display = 'none';
+    document.getElementById('hint-btn').style.display = 'none';
+    document.getElementById('canvas-overlay').style.display = 'none';
+    document.getElementById('drawing-tools').style.display = '';
+    document.getElementById('guess-input-row').style.display = 'none';
+    document.getElementById('guess-panel').querySelector('.guess-feed').innerHTML = '<div class="guess-item system">You are drawing — watch the guesses!</div>';
+    strokes = []; redrawStrokes();
+  } else {
+    document.getElementById('word-for-drawer').style.display = 'none';
+    document.getElementById('word-blanks').textContent = word.w.split('').map(c=>c===' '?' ':'_').join(' ');
+    document.getElementById('word-blanks').style.display = '';
+    document.getElementById('hint-btn').style.display = '';
+    document.getElementById('hint-btn').disabled = false;
+    document.getElementById('canvas-overlay').style.display = hasGuessedCorrectly ? '' : 'none';
+    document.getElementById('canvas-overlay').innerHTML = hasGuessedCorrectly ? '✅ You guessed it! Watch others…' : '👀 Watch &amp; Guess!';
+    document.getElementById('drawing-tools').style.display = 'none';
+    document.getElementById('guess-input-row').style.display = '';
+    document.getElementById('guess-input').disabled = hasGuessedCorrectly;
+    document.getElementById('guess-input').value = '';
+  }
+
+  // Guess feed
+  renderGuessFeed(data.guesses || {}, data.players || {});
+
+  // Sync strokes
+  if (!isDrawer) {
+    strokes = data.strokes ? Object.values(data.strokes) : [];
+    redrawStrokes();
+  }
+
+  // Timer
+  const elapsed = Math.floor((Date.now() - (data.roundStartTime||Date.now())) / 1000);
+  let remaining = Math.max(0, settings.drawTime - elapsed);
+  const tp = document.getElementById('timer-pill');
+  function tick() {
+    tp.textContent = remaining;
+    tp.className = 'timer-pill' + (remaining<=10?' urgent':'');
+    if (remaining<=0) { clearInterval(timerInterval); if(isHost) endRound(); }
+    remaining--;
+  }
+  tick();
+  timerInterval = setInterval(tick, 1000);
+
+  updateStatusBar();
+}
+
+function renderGuessFeed(guesses, players) {
+  const feed = document.getElementById('guess-feed');
+  feed.innerHTML = '';
+  Object.values(guesses).sort((a,b)=>a.time-b.time).forEach(g => {
+    const div = document.createElement('div');
+    div.className = 'guess-item ' + (g.correct?'correct':'wrong');
+    div.innerHTML = `<span class="guesser-name">${g.name}:</span> ${g.correct ? '✅ Correct!' : g.text}`;
+    feed.appendChild(div);
+  });
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// ── HINT ─────────────────────────────────────────────────────────────────────
+window.useHint = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const word = data.words[data.currentRound];
+  const hintsUsed = (data.hintsUsed||0) + 1;
+  // Reveal one more letter
+  const blanks = data.hintBlanks || word.w.split('').map(()=>'_');
+  const hidden = blanks.map((b,i)=>b==='_'?i:-1).filter(i=>i>=0);
+  if (!hidden.length) return;
+  const revealIdx = hidden[Math.floor(Math.random()*hidden.length)];
+  blanks[revealIdx] = word.w[revealIdx];
+  // Deduct points from drawer
+  await update(roomRef, { hintsUsed, hintBlanks: blanks });
+  document.getElementById('word-blanks').textContent = blanks.join(' ');
+  document.getElementById('hint-btn').disabled = true;
+  showToast('Hint used! Drawer loses 100pts');
+  // Deduct from drawer score
+  const drawerId = data.drawOrder[data.currentDrawerIdx % data.drawOrder.length];
+  const scores = data.scores || {};
+  if (scores[drawerId]) {
+    scores[drawerId].score = Math.max(0, (scores[drawerId].score||0) - 100);
+    await update(ref(db, `${roomPath}/scores/${drawerId}/score`), scores[drawerId].score);
+  }
+};
+
+// ── GUESS ────────────────────────────────────────────────────────────────────
+window.submitGuess = async function() {
+  if (isDrawer || hasGuessedCorrectly) return;
+  const input = document.getElementById('guess-input');
+  const guess = input.value.trim();
+  if (!guess) return;
+  input.value = '';
+  const snap = await get(roomRef);
+  const data = snap.val();
+  if (data.state !== 'drawing') return;
+  const word = data.words[data.currentRound];
+  const correct = guess.toUpperCase() === word.w.toUpperCase();
+  const guesses = data.guesses || {};
+  const alreadyCorrect = Object.values(guesses).some(g=>g.playerId===myId&&g.correct);
+  if (alreadyCorrect) return;
+
+  const elapsed = Math.floor((Date.now() - (data.roundStartTime||Date.now())) / 1000);
+  const timeBonus = Math.max(0, data.settings.drawTime - elapsed);
+  let pts = 0;
+  if (correct) {
+    // Speed-based: 500 base + up to 500 time bonus
+    const correctCount = Object.values(guesses).filter(g=>g.correct).length;
+    pts = Math.round(500 + (timeBonus / data.settings.drawTime) * 500) - (correctCount * 50);
+    pts = Math.max(100, pts);
+    hasGuessedCorrectly = true;
+    document.getElementById('guess-input').disabled = true;
+    document.getElementById('canvas-overlay').style.display = '';
+    document.getElementById('canvas-overlay').innerHTML = '✅ You guessed it!';
+    showFloatingPoint('+'+pts, '#06d6a0');
+  } else {
+    wrongGuessCount++;
+    const penalty = data.settings.penalty || 0;
+    if (penalty > 0) {
+      pts = -penalty;
+      showFloatingPoint('-'+penalty, '#e94560');
+    }
+  }
+
+  const guessKey = Date.now().toString();
+  await update(ref(db, `${roomPath}/guesses/${guessKey}`), {
+    playerId: myId, name: myName, text: guess, correct, pts, time: Date.now()
+  });
+
+  // Update score
+  if (pts !== 0) {
+    const currentScore = data.scores?.[myId]?.score || 0;
+    const newScore = Math.max(0, currentScore + pts);
+    await update(ref(db, `${roomPath}/scores/${myId}/score`), newScore);
+    // Update team score
+    const teamKey = myTeam==='red' ? 'redTeamScore' : 'blueTeamScore';
+    const teamScore = Math.max(0, (data[teamKey]||0) + pts);
+    await update(ref(db, `${roomPath}/${teamKey}`), teamScore);
+  }
+
+  // Drawer also gets pts per correct guess
+  if (correct) {
+    const drawerId = data.drawOrder[data.currentDrawerIdx % data.drawOrder.length];
+    if (drawerId !== myId) {
+      const drawerScore = (data.scores?.[drawerId]?.score||0) + 50;
+      await update(ref(db, `${roomPath}/scores/${drawerId}/score`), drawerScore);
+    }
+    // Streak check
+    const team = myTeam;
+    const streakKey = team==='red' ? 'redStreak' : 'blueStreak';
+    const newStreak = (data[streakKey]||0) + 1;
+    const streakAt = data.settings.streakAt;
+    await update(ref(db, `${roomPath}/${streakKey}`), newStreak);
+    if (streakAt > 0 && newStreak >= streakAt) {
+      const bonusPts = streakAt >= 5 ? 300 : 150;
+      const teamKey = team==='red' ? 'redTeamScore' : 'blueTeamScore';
+      const newTeamScore = (data[teamKey]||0) + bonusPts;
+      await update(ref(db, `${roomPath}/${teamKey}`), newTeamScore);
+      await update(ref(db, `${roomPath}/${streakKey}`), 0);
+      showToast(`🔥 ${team.toUpperCase()} TEAM STREAK +${bonusPts}pts!`);
+    }
+
+    // Check if all non-drawers have guessed
+    const players = data.players || {};
+    const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
+    const correctGuessers = Object.values({...guesses, [guessKey]:{correct,playerId:myId}}).filter(g=>g.correct).map(g=>g.playerId);
+    if (nonDrawers.every(id=>correctGuessers.includes(id))) {
+      clearInterval(timerInterval);
+      if (isHost) endRound();
+    }
+  }
+};
+
+document.getElementById('guess-input').addEventListener('keydown', e => { if(e.key==='Enter') window.submitGuess(); });
+
+function showFloatingPoint(text, color) {
+  const el = document.createElement('div');
+  el.className = 'floating-point';
+  el.textContent = text;
+  el.style.color = color;
+  el.style.left = (Math.random()*60+20)+'%';
+  el.style.top = '40%';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1400);
+}
+
+// ── END ROUND ────────────────────────────────────────────────────────────────
+async function endRound() {
+  clearInterval(timerInterval);
+  await update(roomRef, { state:'rating', ratingStart: Date.now() });
+}
+
+// ── RATING ───────────────────────────────────────────────────────────────────
+function showRatingOverlay(data) {
+  if (isDrawer) {
+    // Drawer skips rating — waits
+    document.getElementById('rating-overlay').classList.remove('show');
+    // Check if all ratings submitted
+    const players = data.players || {};
+    const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
+    const ratings = data.ratings || {};
+    if (nonDrawers.every(id=>ratings[id]!==undefined) && isHost) {
+      proceedToRoundResult();
+    }
+    return;
+  }
+  if (data.ratings?.[myId] !== undefined) return; // already rated
+  const drawerName = data.players?.[data.drawOrder?.[data.currentDrawerIdx%data.drawOrder.length]]?.name || 'the drawer';
+  document.getElementById('rating-prompt').textContent = `Rate ${drawerName}'s drawing!`;
+  document.getElementById('rating-overlay').classList.add('show');
+  selectedRating = 0;
+  document.querySelectorAll('.rating-star').forEach(s=>s.classList.remove('selected'));
+  document.getElementById('rating-submit-btn').disabled = true;
+}
+
+window.selectRating = function(n) {
+  selectedRating = n;
+  document.querySelectorAll('.rating-star').forEach((s,i)=>{
+    s.classList.toggle('selected', i<n);
+  });
+  document.getElementById('rating-submit-btn').disabled = false;
+};
+
+window.submitRating = async function() {
+  if (!selectedRating) return;
+  document.getElementById('rating-overlay').classList.remove('show');
+  await update(ref(db, `${roomPath}/ratings/${myId}`), selectedRating);
+  showToast('Rating submitted!');
+  // Check if all done — host proceeds
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const players = data.players || {};
+  const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
+  const ratings = data.ratings || {};
+  if (nonDrawers.every(id=>ratings[id]!==undefined) && isHost) proceedToRoundResult();
+  // Auto-proceed after 15s even if not everyone rated
+  setTimeout(async()=>{ if(isHost){const s2=await get(roomRef);if(s2.val()?.state==='rating')proceedToRoundResult();} }, 15000);
+};
+
+async function proceedToRoundResult() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const ratings = data.ratings || {};
+  const drawerKey = data.drawOrder[data.currentDrawerIdx % data.drawOrder.length];
+  const ratingValues = Object.values(ratings).filter(r=>typeof r==='number');
+  const avgRating = ratingValues.length ? (ratingValues.reduce((a,b)=>a+b,0)/ratingValues.length).toFixed(1) : 'N/A';
+  // Bonus for high rating
+  if (avgRating >= 4 && drawerKey) {
+    const currentScore = data.scores?.[drawerKey]?.score||0;
+    await update(ref(db,`${roomPath}/scores/${drawerKey}/score`), currentScore+100);
+    showToast('⭐ High rated drawing! Drawer +100pts');
+  }
+  await update(roomRef, { state:'roundresult', avgRating, ratings:null });
+}
+
+// ── ROUND RESULT ─────────────────────────────────────────────────────────────
+function showRoundResult(data) {
+  showScreen('result');
+  clearInterval(timerInterval);
+  const word = data.words?.[data.currentRound];
+  document.getElementById('result-word').textContent = word?.w || '—';
+  const drawerName = data.players?.[data.drawOrder?.[data.currentDrawerIdx%data.drawOrder.length]]?.name||'';
+  document.getElementById('result-drawer').textContent = `Drawn by ${drawerName} · ⭐ Avg rating: ${data.avgRating||'N/A'}`;
+  document.getElementById('host-next-ctrl').style.display = isHost ? '' : 'none';
+  document.getElementById('result-wait-msg').style.display = isHost ? 'none' : '';
+  // Render scoreboard
+  const scores = data.scores || {};
+  const sorted = Object.values(scores).sort((a,b)=>b.score-a.score);
+  const max = sorted[0]?.score||1;
+  const list = document.getElementById('scoreboard');
+  list.innerHTML = '';
+  sorted.forEach((s,i)=>{
+    const div = document.createElement('div'); div.className='score-row';
+    const rankCls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    div.innerHTML=`<div class="rank-num ${rankCls}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+      <div class="player-info"><div class="player-name">${s.name}</div><div class="team-tag ${s.team}">${s.team?.toUpperCase()} TEAM</div>
+      <div class="score-bar"><div class="score-bar-fill ${s.team}" style="width:${s.score/max*100}%"></div></div></div>
+      <div class="pts">${s.score}</div>`;
+    list.appendChild(div);
+  });
+}
+
+window.nextRound = async function() {
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const nextRound = (data.currentRound||0)+1;
+  const nextDrawerIdx = (data.currentDrawerIdx||0)+1;
+  if (nextRound >= data.settings.rounds) {
+    // Game over
+    await update(roomRef, { state:'final' });
+    return;
+  }
+  strokes=[];
+  await update(roomRef, {
+    state:'drawing', currentRound:nextRound, currentDrawerIdx:nextDrawerIdx,
+    strokes:null, guesses:null, hintsUsed:0, hintBlanks:null,
+    ratings:null, roundStartTime:Date.now(),
+  });
+};
+
+// ── FINAL SCREEN ─────────────────────────────────────────────────────────────
+function showFinalScreen(data) {
+  showScreen('final');
+  clearInterval(timerInterval);
+  const redScore = data.redTeamScore||0, blueScore = data.blueTeamScore||0;
+  const banner = document.getElementById('final-banner');
+  const heading = document.getElementById('final-heading');
+  const trophy = document.getElementById('final-trophy');
+  const reason = document.getElementById('final-reason');
+  if (redScore > blueScore) {
+    banner.className='final-banner red'; heading.className='red'; heading.textContent='RED TEAM ARE THE WINNERS!!!';
+    trophy.textContent='🏆'; reason.textContent=`Red: ${redScore} pts · Blue: ${blueScore} pts`;
+  } else if (blueScore > redScore) {
+    banner.className='final-banner blue'; heading.className='blue'; heading.textContent='BLUE TEAM ARE THE WINNERS!!!';
+    trophy.textContent='🏆'; reason.textContent=`Blue: ${blueScore} pts · Red: ${redScore} pts`;
+  } else {
+    banner.className='final-banner draw'; heading.className='draw'; heading.textContent="IT'S A DRAW!!!";
+    trophy.textContent='🤝'; reason.textContent=`Both teams scored ${redScore} pts!`;
+  }
+  // Hall of Fame
+  const scores = data.scores||{};
+  const allPlayers = Object.values(scores);
+  const topDrawer = allPlayers.reduce((best,p)=>p.score>=(best?.score||0)?p:best, null);
+  const guesses = data.guesses ? Object.values(data.guesses) : [];
+  const hof = document.getElementById('hof-grid');
+  hof.innerHTML=`
+    <div class="hof-card"><div class="hof-icon">🎨</div><div class="hof-label">Best Overall</div><div class="hof-winner">${topDrawer?.name||'—'}</div><div class="hof-desc">${topDrawer?.score||0} pts</div></div>
+    <div class="hof-card"><div class="hof-icon">⭐</div><div class="hof-label">Top Rated Drawing</div><div class="hof-winner">${data.topRatedDrawer||topDrawer?.name||'—'}</div><div class="hof-desc">By popular vote</div></div>`;
+  // Team cards
+  const teamsEl = document.getElementById('final-teams');
+  const winner = redScore>=blueScore?'red':'blue';
+  const loser = winner==='red'?'blue':'red';
+  ['red','blue'].forEach(team=>{
+    const isWin = team===winner && redScore!==blueScore;
+    const card = document.createElement('div');
+    card.className=`final-team-card ${isWin?'win ':''} ${team}`;
+    const teamPlayers = allPlayers.filter(p=>p.team===team).sort((a,b)=>b.score-a.score);
+    card.innerHTML=`<div class="final-team-title ${team}">${isWin?'🏆':redScore===blueScore?'🤝':'😔'} ${team.toUpperCase()} TEAM</div>`+
+      teamPlayers.map(p=>`<div class="final-player-row">👤 ${p.name} <span style="margin-left:auto;color:var(--yellow);font-family:'Fredoka One',cursive">${p.score}pts</span></div>`).join('');
+    teamsEl.appendChild(card);
+  });
+}
+
+window.playAgain = async function() {
+  isHost=false; isDrawer=false; myTeam=null;
+  document.getElementById('host-settings').style.display='none';
+  document.getElementById('host-claimed-msg').style.display='none';
+  document.getElementById('lobby-reset-btn').style.display='none';
+  document.getElementById('claim-host-btn').style.display='';
+  document.getElementById('wait-msg').style.display='';
+  document.getElementById('final-teams').innerHTML='';
+  const snap = await get(roomRef);
+  const players = snap.val()?.players||{};
+  const resetPlayers={};
+  Object.entries(players).forEach(([id,p])=>{ resetPlayers[id]={...p,team:null,score:0}; });
+  await update(roomRef, { state:'lobby', players:resetPlayers, scores:null, strokes:null, guesses:null, words:null, ratings:null, hostId:null, redTeamScore:0, blueTeamScore:0 });
+  updateStatusBar();
+};
+
+// ── STATUS BAR ───────────────────────────────────────────────────────────────
+function updateStatusBar() {
+  if (!myName) return;
+  document.getElementById('sb-name').textContent = myName;
+  const roleEl = document.getElementById('sb-role');
+  if (isHost && isDrawer) { roleEl.textContent='Host · Drawing'; roleEl.className='sb-role drawer'; }
+  else if (isHost) { roleEl.textContent='Host'; roleEl.className='sb-role host'; }
+  else if (isDrawer) { roleEl.textContent='Drawing now'; roleEl.className='sb-role drawer'; }
+  else if (myTeam) { roleEl.textContent=`Guesser · ${myTeam.charAt(0).toUpperCase()+myTeam.slice(1)}`; roleEl.className=`sb-role guesser ${myTeam}`; }
+  else { roleEl.textContent='No team yet'; roleEl.className='sb-role'; }
+}
+
+// ── RESET ────────────────────────────────────────────────────────────────────
+window.showResetDialog = function() { document.getElementById('reset-overlay').classList.add('show'); };
+window.closeResetDialog = function() { document.getElementById('reset-overlay').classList.remove('show'); };
+window.confirmReset = async function() {
+  document.getElementById('reset-overlay').classList.remove('show');
+  if (!db) {
+    const fbUrl=document.getElementById('fb-url').value.trim(), room=document.getElementById('room-name').value.trim();
+    try {
+      const {initializeApp:ia}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const {getDatabase:gd,ref:r}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      db=gd(ia({databaseURL:fbUrl},'dd-reset-'+Date.now())); roomRef=r(db,'doodle/'+room);
+    } catch(e){showToast('Could not connect');return;}
+  }
+  try {
+    const {remove:rm}=await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+    await rm(roomRef); showScreen('setup'); showToast('Game reset!');
+  } catch(e){showToast('Reset failed: '+e.message);}
+};
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  currentScreen=name;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(name+'-screen').classList.add('active');
+}
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>

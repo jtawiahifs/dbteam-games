@@ -151,8 +151,7 @@
     .modal-box { padding: 28px 22px; }
   }
   @media (min-width: 861px) and (max-width: 1060px) {
-    .games-grid { grid-template-columns: 1fr 1fr; max-width: 700px; }
-    .game-card:last-child { grid-column: 1 / -1; max-width: 340px; margin: 0 auto; }
+    .games-grid { grid-template-columns: 1fr 1fr; max-width: 820px; }
   }
 </style>
 </head>
@@ -168,11 +167,11 @@
       <span class="highlight-red">Game</span> Zone
     </h1>
     <p class="hero-sub">Pick a game &amp; let the challenge begin</p>
-    <div class="divider"><span></span><em>3 Games Available</em><span></span></div>
+    <div class="divider"><span></span><em>4 Games Available</em><span></span></div>
   </div>
 
   <!-- GAME CARDS -->
-  <div class="games-grid">
+  <div class="games-grid" style="grid-template-columns:repeat(2,1fr);max-width:820px;">
 
     <!-- Trivia -->
     <div class="game-card trivia" data-num="01">
@@ -267,6 +266,32 @@
         </button>
       </div>
     </div>
+
+    <!-- Doodle Dash -->
+    <div class="game-card" id="doodle-card" data-num="04" style="--card-accent:#ffd700">
+      <div class="card-icon" style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.25)">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <path d="M6 28 Q10 20 16 16 Q22 12 28 8" stroke="#ffd700" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <circle cx="28" cy="8" r="4" fill="#e94560"/>
+          <rect x="2" y="29" width="32" height="5" rx="2" fill="#ffd700" opacity="0.3"/>
+          <path d="M8 24 Q12 18 18 22" stroke="#0f9cf5" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <path d="M18 22 Q22 26 26 20" stroke="#06d6a0" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <div class="card-tag" style="color:#ffd700">Drawing Game</div>
+        <div class="card-title">DB Doodle Dash</div>
+        <p class="card-desc">Draw a word, your team guesses it. Red vs Blue team battle with speed bonuses, streak multipliers, drawer ratings, and a Hall of Fame. Like Skribbl, but better!</p>
+      </div>
+      <div class="card-actions">
+        <a class="card-cta" href="https://jtawiahifs.github.io/dbteam-games/doodle-dash.html" target="_blank" style="background:rgba(255,215,0,.12);color:#ffd700;border:1px solid rgba(255,215,0,.3)">
+          Play Now
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <button class="card-rules-btn" onclick="openModal('doodle')">📖 Rules</button>
+      </div>
+    </div>
+
 
   </div>
 
@@ -497,6 +522,84 @@
       <p style="font-size:0.8rem;color:#666">💡 <strong>Spymaster tip:</strong> Find a clue that links multiple of your cards without accidentally pointing at the Assassin or the other team's cards. The best Spymasters think several turns ahead.</p>
     </div>
     <a class="modal-play-btn" href="https://jtawiahifs.github.io/dbteam-games/codenames.html" target="_blank">
+      Play Now
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+</div>
+
+<!-- ══ DOODLE DASH MODAL ════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-doodle" onclick="handleOverlayClick(event,'doodle')">
+  <div class="modal-box" style="border-top:3px solid #ffd700">
+    <button class="modal-close" onclick="closeModal('doodle')">✕</button>
+    <div class="modal-game-tag" style="color:#ffd700">Drawing Game</div>
+    <div class="modal-title">DB Doodle Dash — Rules</div>
+    <div class="modal-content">
+      <h3 style="color:#ffd700">Objective</h3>
+      <p>Red vs Blue team drawing-and-guessing battle. One player draws a secret word while their teammates — and the other team — race to guess it. Most points at the end wins!</p>
+
+      <h3 style="color:#ffd700">Roles Each Round</h3>
+      <ul>
+        <li><strong>✏️ Drawer</strong> — sees the secret word and draws it on the canvas. Cannot write letters or numbers.</li>
+        <li><strong>👀 Guesser</strong> — types guesses into the chat box. Faster correct guesses = more points.</li>
+        <li>Roles rotate so <strong>everyone draws</strong> over the course of the game.</li>
+      </ul>
+
+      <h3 style="color:#ffd700">Setup</h3>
+      <ul>
+        <li>Everyone enters their name and joins the lobby.</li>
+        <li>Pick <strong>Join Red</strong> or <strong>Join Blue</strong> — teams must be balanced (max 1 difference).</li>
+        <li>One player clicks <strong>👑 Become Host</strong> to configure and start.</li>
+        <li>Host sets: rounds, draw time, difficulty, wrong guess penalty, streak bonus, and word source.</li>
+      </ul>
+
+      <h3 style="color:#ffd700">Scoring</h3>
+      <ul>
+        <li><strong>Correct guess</strong> — up to 1,000 pts based on speed. Later guessers score less.</li>
+        <li><strong>Drawer</strong> — earns +50 pts each time someone guesses correctly.</li>
+        <li><strong>Wrong guess penalty</strong> — optional deduction (25 or 50 pts) per wrong guess to discourage spam.</li>
+        <li><strong>Streak bonus</strong> — if your team guesses correctly 3 or 5 rounds in a row, earn a big bonus!</li>
+        <li><strong>Hint</strong> — the drawer can reveal one letter to help, but loses 100 pts.</li>
+        <li><strong>High rating bonus</strong> — if a drawing averages 4+ stars, the drawer gets +100 pts.</li>
+      </ul>
+
+      <h3 style="color:#ffd700">After Each Round — Rate the Drawing!</h3>
+      <p>Once the round ends, all guessers rate the drawing from 1–5 stars ⭐. High-rated drawers get bonus points. The best-rated drawing of the game earns a spot in the <strong>Hall of Fame</strong>!</p>
+
+      <h3 style="color:#ffd700">Word Difficulties</h3>
+      <p>
+        <span class="rule-pill" style="color:#06d6a0;border-color:#06d6a0">🟢 Easy — DOG, CAKE, BIRD</span>
+        <span class="rule-pill" style="color:#ff6b35;border-color:#ff6b35">🟡 Medium — VOLCANO, COMPASS</span>
+        <span class="rule-pill" style="color:#e94560;border-color:#e94560">🔴 Hard — DATABASE, GOLDENGATE</span>
+      </p>
+
+      <h3 style="color:#ffd700">Custom Words</h3>
+      <p>The host can enter their own word list — one word per line. Add a difficulty tag with a colon: <strong>REPLICATION:hard</strong>, <strong>INDEX:easy</strong>. Great for Oracle/Azure themed rounds!</p>
+
+      <h3 style="color:#ffd700">⏱️ How Long Will It Take?</h3>
+      <p>Each round = draw time + ~20 seconds for rating. With rotating drawers, multiply by the number of players per team.</p>
+      <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:0.82rem">
+        <thead>
+          <tr style="border-bottom:1px solid #333">
+            <th style="text-align:left;padding:6px 8px;color:#aaa;font-weight:600">Rounds</th>
+            <th style="text-align:left;padding:6px 8px;color:#aaa;font-weight:600">Draw Time</th>
+            <th style="text-align:left;padding:6px 8px;color:#aaa;font-weight:600">Est. Time</th>
+            <th style="text-align:left;padding:6px 8px;color:#aaa;font-weight:600">Good for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #222"><td style="padding:6px 8px">6</td><td style="padding:6px 8px">90s</td><td style="padding:6px 8px"><strong style="color:#ffd700">~12 mins</strong></td><td style="padding:6px 8px;color:#888">Quick game</td></tr>
+          <tr style="border-bottom:1px solid #222"><td style="padding:6px 8px">8</td><td style="padding:6px 8px">90s</td><td style="padding:6px 8px"><strong style="color:#ffd700">~16 mins</strong></td><td style="padding:6px 8px;color:#888">Standard game</td></tr>
+          <tr style="border-bottom:1px solid #222"><td style="padding:6px 8px">10</td><td style="padding:6px 8px">90s</td><td style="padding:6px 8px"><strong style="color:#ffd700">~20 mins</strong></td><td style="padding:6px 8px;color:#888">Longer session</td></tr>
+          <tr><td style="padding:6px 8px">8</td><td style="padding:6px 8px">45s</td><td style="padding:6px 8px"><strong style="color:#ffd700">~9 mins</strong></td><td style="padding:6px 8px;color:#888">Fast &amp; chaotic!</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:0.78rem;color:#666">💡 <strong>For a 1-hour session:</strong> 8 rounds at 90s fits nicely in ~16 mins, leaving room for all 4 games. Or go full Doodle Dash with 3 back-to-back games using different word categories!</p>
+
+      <div class="modal-divider"></div>
+      <p style="font-size:0.8rem;color:#666">💡 <strong>Tip:</strong> Use the Hard difficulty with Oracle/Azure custom words for a hilarious team bonding round — watching someone try to draw "GOLDENGATE" or "REPLICATION" never gets old!</p>
+    </div>
+    <a class="modal-play-btn" href="https://jtawiahifs.github.io/dbteam-games/doodle-dash.html" target="_blank" style="background:rgba(255,215,0,.14);color:#ffd700;border:1px solid rgba(255,215,0,.35)">
       Play Now
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
