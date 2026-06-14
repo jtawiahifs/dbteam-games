@@ -658,17 +658,40 @@ window.fillCanvas = function() {
 
 function buildColorGrid() {
   const grid = document.getElementById('color-grid');
+  if (!grid) return;
+  grid.innerHTML = ''; // clear any duplicates
   COLORS.forEach(c => {
     const sw = document.createElement('div');
-    sw.className = 'color-swatch' + (c===currentColor?' selected':'');
+    sw.className = 'color-swatch' + (c === currentColor ? ' selected' : '');
     sw.style.background = c;
-    sw.style.border = c==='#ffffff' ? '2px solid #555' : '';
-    sw.onclick = () => { currentColor=c; document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('selected')); sw.classList.add('selected'); };
+    sw.style.border = c === '#ffffff' ? '2px solid #555' : '';
+    // Use mousedown + preventDefault so clicking a swatch doesn't
+    // steal canvas focus or trigger an accidental endDraw
+    sw.addEventListener('mousedown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      currentColor = c;
+      currentTool = 'pen'; // switch back to pen when picking a colour
+      document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+      // Also visually re-select the pen tool button
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
+      const penBtn = document.getElementById('tool-pen');
+      if (penBtn) penBtn.classList.add('selected');
+    });
     grid.appendChild(sw);
   });
 }
-window.setBrush = function(size, btn) { brushSize=size; document.querySelectorAll('.brush-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); };
-window.setTool = function(tool, btn) { currentTool=tool; document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('selected')); btn.classList.add('selected'); };
+window.setBrush = function(size, btn) {
+  brushSize = size;
+  document.querySelectorAll('.brush-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
+window.setTool = function(tool, btn) {
+  currentTool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
 
 // ── JOIN / HOST ──────────────────────────────────────────────────────────────
 window.joinRoom = async function() {
@@ -746,6 +769,20 @@ function subscribeRoom() {
     if (me) { myTeam = me.team; }
     if (data.state==='lobby') renderLobby(data);
     if (data.state==='drawing') renderDrawing(data);
+    // When host sets timedOut, immediately disable guessing for everyone
+    if (data.timedOut && data.state==='drawing' && !isDrawer) {
+      const guessInput = document.getElementById('guess-input');
+      if (guessInput) guessInput.disabled = true;
+      if (data.revealedWord) {
+        const blanksEl = document.getElementById('word-blanks');
+        if (blanksEl) blanksEl.textContent = data.revealedWord;
+        const overlay = document.getElementById('canvas-overlay');
+        if (overlay && !hasGuessedCorrectly) {
+          overlay.style.display = '';
+          overlay.innerHTML = `⏰ Time up! The word was: <strong>${data.revealedWord}</strong>`;
+        }
+      }
+    }
     if (data.state==='rating') showRatingOverlay(data);
     if (data.state==='roundresult') showRoundResult(data);
     if (data.state==='final') showFinalScreen(data);
@@ -921,7 +958,9 @@ function renderDrawing(data) {
   if (!word) return;
 
   // Update scores always
-  document.getElementById('round-badge').textContent = `Round ${currentRound+1}/${totalRounds}`;
+  const drawerName = data.players ? (data.players[drawerIdInOrder]?.name || 'Unknown') : 'Unknown';
+  const drawerLabel = isDrawer ? 'Your turn to draw!' : `${drawerName} is drawing`;
+  document.getElementById('round-badge').textContent = `Round ${currentRound+1}/${totalRounds} · ${drawerLabel}`;
   document.getElementById('red-score').textContent = redTeamScore;
   document.getElementById('blue-score').textContent = blueTeamScore;
 
@@ -1176,12 +1215,14 @@ async function endRound() {
   const wordsArr = data.words ? Object.values(data.words) : [];
   const currentRound = data.currentRound || 0;
   const word = wordsArr.find(w => w.idx === currentRound) || wordsArr[currentRound];
-  // Store revealed word so all clients can display it
-  await update(roomRef, {
-    state: 'rating',
-    ratingStart: Date.now(),
-    revealedWord: word ? word.w : ''
-  });
+  const wordStr = word ? word.w : '';
+  // First: set timedOut so ALL clients immediately disable guess input
+  // and reveal the word — BEFORE moving to rating
+  await update(roomRef, { timedOut: true, revealedWord: wordStr });
+  // Short delay so clients can react, then move to rating
+  setTimeout(async () => {
+    await update(roomRef, { state: 'rating', ratingStart: Date.now() });
+  }, 1500);
 }
 
 // ── RATING ───────────────────────────────────────────────────────────────────
@@ -1235,7 +1276,8 @@ async function proceedToRoundResult() {
   const snap = await get(roomRef);
   const data = snap.val();
   const ratings = data.ratings || {};
-  const drawerKey = data.drawOrder[data.currentDrawerIdx % data.drawOrder.length];
+  const drawOrderArr = data.drawOrder ? Object.values(data.drawOrder) : [];
+  const drawerKey = drawOrderArr[data.currentDrawerIdx % drawOrderArr.length];
   const ratingValues = Object.values(ratings).filter(r=>typeof r==='number');
   const avgRating = ratingValues.length ? (ratingValues.reduce((a,b)=>a+b,0)/ratingValues.length).toFixed(1) : 'N/A';
   // Bonus for high rating
@@ -1253,7 +1295,8 @@ function showRoundResult(data) {
   clearInterval(timerInterval);
   const word = data.words?.[data.currentRound];
   document.getElementById('result-word').textContent = data.revealedWord || word?.w || '—';
-  const drawerName = data.players?.[data.drawOrder?.[data.currentDrawerIdx%data.drawOrder.length]]?.name||'';
+  const drawOrderArr2 = data.drawOrder ? Object.values(data.drawOrder) : [];
+  const drawerName = data.players?.[drawOrderArr2[data.currentDrawerIdx % drawOrderArr2.length]]?.name || '';
   document.getElementById('result-drawer').textContent = `Drawn by ${drawerName} · ⭐ Avg rating: ${data.avgRating||'N/A'}`;
   document.getElementById('host-next-ctrl').style.display = isHost ? '' : 'none';
   document.getElementById('result-wait-msg').style.display = isHost ? 'none' : '';
@@ -1277,18 +1320,30 @@ function showRoundResult(data) {
 window.nextRound = async function() {
   const snap = await get(roomRef);
   const data = snap.val();
-  const nextRound = (data.currentRound||0)+1;
-  const nextDrawerIdx = (data.currentDrawerIdx||0)+1;
-  if (nextRound >= data.settings.rounds) {
-    // Game over
-    await update(roomRef, { state:'final' });
+  const nextRound = (data.currentRound || 0) + 1;
+  const totalPlayers = data.drawOrder ? Object.keys(data.drawOrder).length : 1;
+  // Round-robin: cycle through all players equally
+  const nextDrawerIdx = (data.currentDrawerIdx || 0) + 1;
+  if (nextRound >= (data.settings?.rounds || 8)) {
+    await update(roomRef, { state: 'final' });
     return;
   }
-  strokes=[];
+  // Reset for new round — clear strokes and guesses via sentinel values
+  lastDrawingRound = -1; // force full UI re-render for new round
+  strokes = [];
+  // Remove stale strokes and guesses from Firebase
+  const { remove: rm } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  await rm(ref(db, `${roomPath}/strokes`));
+  await rm(ref(db, `${roomPath}/guesses`));
   await update(roomRef, {
-    state:'drawing', currentRound:nextRound, currentDrawerIdx:nextDrawerIdx,
-    hintsUsed:0, hintBlanks:'',
-    ratings:'none', roundStartTime:Date.now(),
+    state: 'drawing',
+    currentRound: nextRound,
+    currentDrawerIdx: nextDrawerIdx,
+    hintsUsed: 0,
+    hintBlanks: '',
+    revealedWord: '',
+    timedOut: false,
+    roundStartTime: Date.now(),
   });
 };
 
