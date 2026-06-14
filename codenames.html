@@ -616,6 +616,7 @@
     </svg>
     DB TEAM <span class="dot"> </span>CODE NAMES
   </div>
+  <button id="exit-btn" onclick="exitGame()" style="display:none;background:rgba(232,58,58,.1);border:1px solid var(--red);border-radius:6px;color:var(--red);font-family:'IBM Plex Sans',sans-serif;font-weight:700;font-size:0.78rem;padding:6px 14px;cursor:pointer">🚪 Exit</button>
   <div id="status-bar">
     <span class="sb-name" id="sb-name">Not connected</span>
     <span class="sb-role unassigned" id="sb-role">—</span>
@@ -674,6 +675,7 @@
       <label>Your Name</label>
       <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
     </div>
+    <p id="join-name-error" style="display:none;color:var(--red);font-size:0.82rem;font-weight:700;margin-top:4px"></p>
     <button class="btn btn-primary w100" style="margin-top:10px" onclick="joinRoom()">Join →</button>
     <p class="text-muted mt8">After joining, pick your team in the lobby.</p>
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
@@ -888,7 +890,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, update, get, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 let db, roomRef, roomPath, myId, myName, myTeam = null, isHost = false, isSpymaster = false;
 let timerInterval, gameState = {};
@@ -981,12 +983,14 @@ window.joinRoom = async function() {
     const nameTaken = Object.values(existingPlayers).some(
       p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
     );
-    if (nameTaken) { showToast(`"${name}" is already taken — choose a different name`); return; }
+    if (nameTaken) {
+      const errEl = document.getElementById('join-name-error');
+      if (errEl) { errEl.textContent = `"${name}" is already in use — choose a different name`; errEl.style.display = ''; }
+      else { alert(`"${name}" is already in use — choose a different name`); }
+      return;
+    }
 
-    const playerRef = ref(db, `${roomPath}/players/${myId}`);
-    await update(playerRef, { name, joinedAt: Date.now(), team: null, isSpy: false });
-    // Remove player automatically on disconnect
-    onDisconnect(playerRef).remove();
+    await update(ref(db, `${roomPath}/players/${myId}`), { name, joinedAt: Date.now(), team: null, isSpy: false });
 
     const snap = await get(roomRef);
     const data = snap.val();
@@ -1651,9 +1655,22 @@ function updateChatVisibility() {
   document.getElementById('blue-chat-panel').style.display = myTeam === 'blue' ? '' : 'none';
 }
 
+window.exitGame = async function() {
+  if (!db || !roomRef || !myId) { location.reload(); return; }
+  if (!confirm('Exit the game? You will be removed from the room.')) return;
+  try {
+    await update(ref(db, `${roomPath}/players/${myId}`), null);
+    const snap = await get(roomRef);
+    if (snap.val()?.hostId === myId) await update(roomRef, { hostId: null });
+  } catch(e) {}
+  location.reload();
+};
+
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(name + '-screen').classList.add('active');
+  const exitBtn = document.getElementById('exit-btn');
+  if (exitBtn) exitBtn.style.display = name === 'setup' ? 'none' : '';
 }
 function showToast(msg) {
   const t = document.getElementById('toast');

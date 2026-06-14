@@ -254,6 +254,7 @@ canvas{display:block;touch-action:none;}
     </svg>
     <span class="logo-db">DB</span> Doodle Dash
   </div>
+  <button id="exit-btn" onclick="exitGame()" style="display:none;background:rgba(233,69,96,.15);border:1px solid #e94560;border-radius:6px;color:#e94560;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.78rem;padding:6px 14px;cursor:pointer">🚪 Exit Game</button>
   <div id="status-bar">
     <span class="sb-name" id="sb-name">Not connected</span>
     <span class="sb-role" id="sb-role">—</span>
@@ -270,8 +271,9 @@ canvas{display:block;touch-action:none;}
   <div class="setup-card">
     <div class="ig">
       <label>Your Name</label>
-      <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
+      <input type="text" id="player-name" placeholder="e.g. Alice" autofocus oninput="const e=document.getElementById('join-name-error');if(e)e.style.display='none'">
     </div>
+    <p id="join-name-error" style="display:none;color:#e94560;font-size:0.82rem;font-weight:700;margin-top:4px"></p>
     <button class="btn btn-primary w100" onclick="joinRoom()" style="margin-top:4px">Join Game →</button>
     <p class="text-muted mt8">Anyone in the lobby can become the host.</p>
     <hr style="border:none;border-top:2px solid var(--border);margin:18px 0">
@@ -502,7 +504,7 @@ canvas{display:block;touch-action:none;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, update, get, onValue, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, update, get, onValue, remove, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 // ── STATE ───────────────────────────────────────────────────────────────────
 let db, roomRef, roomPath, myId, myName, myTeam=null, isHost=false, isDrawer=false;
@@ -712,7 +714,10 @@ window.joinRoom = async function() {
       p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
     );
     if (nameTaken) {
-      showToast(`"${name}" is already taken — choose a different name`);
+      document.getElementById('sb-name').textContent = 'Not connected';
+      const errEl = document.getElementById('join-name-error');
+      if (errEl) { errEl.textContent = `"${name}" is already in use — choose a different name`; errEl.style.display = ''; }
+      else { alert(`"${name}" is already in use — please choose a different name`); }
       return;
     }
 
@@ -721,9 +726,6 @@ window.joinRoom = async function() {
 
     const playerRef = ref(db, `${roomPath}/players/${myId}`);
     await update(playerRef, { name, joinedAt: Date.now(), team: null, score: 0 });
-
-    // ── Remove player from Firebase automatically when they disconnect ────
-    onDisconnect(playerRef).remove();
 
     const snap = await get(roomRef);
     if (!snap.val()?.state) await update(roomRef, { state: 'lobby' });
@@ -1458,10 +1460,25 @@ window.confirmReset = async function() {
 };
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
+window.exitGame = async function() {
+  if (!db || !roomPath || !myId) { location.reload(); return; }
+  if (!confirm('Exit the game? You will be removed from the room.')) return;
+  try {
+    await remove(ref(db, `${roomPath}/players/${myId}`));
+    // If we were host, clear hostId
+    const snap = await get(roomRef);
+    if (snap.val()?.hostId === myId) await update(roomRef, { hostId: '' });
+  } catch(e) { /* best effort */ }
+  location.reload();
+};
+
 function showScreen(name) {
   currentScreen=name;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(name+'-screen').classList.add('active');
+  // Show exit button on all screens except setup
+  const exitBtn = document.getElementById('exit-btn');
+  if (exitBtn) exitBtn.style.display = name === 'setup' ? 'none' : '';
 }
 function showToast(msg) {
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');

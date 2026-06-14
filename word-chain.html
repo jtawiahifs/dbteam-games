@@ -450,6 +450,7 @@
   <div class="logo">
     DB TEAM <span class="chain">WORD CHAIN</span>
   </div>
+  <button id="exit-btn" onclick="exitGame()" style="display:none;background:rgba(125,211,252,.1);border:1px solid var(--accent);border-radius:6px;color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;padding:6px 14px;cursor:pointer">🚪 Exit</button>
   <div id="status-bar">Not connected</div>
 </header>
 
@@ -559,6 +560,7 @@
       <label>Your Name</label>
       <input type="text" id="player-name" placeholder="e.g. Alice" autofocus>
     </div>
+    <p id="join-name-error" style="display:none;color:#e63946;font-size:0.82rem;font-weight:700;margin-top:4px"></p>
     <button class="btn btn-primary w100" style="margin-top:10px" onclick="joinRoom()">Join Game →</button>
     <p class="text-muted mt8">Anyone in the lobby can become the host.</p>
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
@@ -763,7 +765,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, update, get, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 let db, roomRef, myId, myName, isHost = false;
 let timerInterval, gameSettings = { rounds: 8, secs: 30 };
@@ -866,12 +868,14 @@ window.joinRoom = async function() {
     const nameTaken = Object.values(existingPlayers).some(
       p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
     );
-    if (nameTaken) { showToast(`"${name}" is already taken — choose a different name`); return; }
+    if (nameTaken) {
+      const errEl = document.getElementById('join-name-error');
+      if (errEl) { errEl.textContent = `"${name}" is already in use — choose a different name`; errEl.style.display = ''; }
+      else { alert(`"${name}" is already in use — choose a different name`); }
+      return;
+    }
 
-    const playerRef = ref(db, `wordchain/${room}/players/${myId}`);
-    await update(playerRef, { name, joinedAt: Date.now(), score: 0 });
-    // Remove player automatically on disconnect
-    onDisconnect(playerRef).remove();
+    await update(ref(db, `wordchain/${room}/players/${myId}`), { name, joinedAt: Date.now(), score: 0 });
 
     const snap = await get(roomRef);
     const data = snap.val();
@@ -1232,10 +1236,24 @@ window.confirmReset = async function() {
   } catch(e) { showToast('Reset failed: ' + e.message); }
 };
 
+window.exitGame = async function() {
+  if (!db || !roomRef || !myId) { location.reload(); return; }
+  if (!confirm('Exit the game? You will be removed from the room.')) return;
+  try {
+    const room = document.getElementById('room-name').value.trim();
+    await update(ref(db, `wordchain/${room}/players/${myId}`), null);
+    const snap = await get(roomRef);
+    if (snap.val()?.hostId === myId) await update(roomRef, { hostId: null });
+  } catch(e) {}
+  location.reload();
+};
+
 function showScreen(name) {
   currentScreen = name;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(name + '-screen').classList.add('active');
+  const exitBtn = document.getElementById('exit-btn');
+  if (exitBtn) exitBtn.style.display = name === 'setup' ? 'none' : '';
 }
 function showToast(msg) {
   const t = document.getElementById('toast');
