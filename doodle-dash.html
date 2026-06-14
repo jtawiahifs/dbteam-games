@@ -451,10 +451,21 @@ canvas{display:block;touch-action:none;}
     <div class="drawer-name" id="result-drawer"></div>
   </div>
   <div class="scoreboard w100" id="scoreboard"></div>
-  <div id="host-next-ctrl" style="display:none;margin-top:8px">
-    <button class="btn btn-primary" onclick="nextRound()">Next Round →</button>
+  <div id="result-rating-area" style="display:none;text-align:center;margin-top:10px">
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:8px">Rate the drawing!</p>
+    <div class="rating-stars" id="result-stars">
+      <span class="rating-star" onclick="quickRate(1)">⭐</span>
+      <span class="rating-star" onclick="quickRate(2)">⭐</span>
+      <span class="rating-star" onclick="quickRate(3)">⭐</span>
+      <span class="rating-star" onclick="quickRate(4)">⭐</span>
+      <span class="rating-star" onclick="quickRate(5)">⭐</span>
+    </div>
   </div>
-  <p class="text-muted text-center" id="result-wait-msg" style="display:none">Waiting for host…</p>
+  <div id="host-next-ctrl" style="display:none;margin-top:16px;text-align:center">
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:8px">You were drawing — ready for the next player?</p>
+    <button class="btn btn-primary" style="font-size:1.1rem;padding:14px 32px" onclick="nextRound()">▶️ Next Player →</button>
+  </div>
+  <p class="text-muted text-center" id="result-wait-msg" style="display:none">⏳ Waiting for the drawer to start next round…</p>
 </div>
 
 <!-- FINAL SCREEN -->
@@ -577,22 +588,24 @@ function getPos(e) {
 function startDraw(e) {
   if (!isDrawer) return;
   drawing = true;
+  ctx = canvas.getContext('2d'); // always re-get context after any resize
   const pos = getPos(e);
-  currentStroke = {
-    color: currentTool==='eraser' ? '#fafafa' : currentColor,
-    size: currentTool==='eraser' ? brushSize*3 : brushSize,
-    points: [pos]
-  };
-  ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+  const strokeColor = currentTool==='eraser' ? '#fafafa' : currentColor;
+  const strokeSize = currentTool==='eraser' ? brushSize*3 : brushSize;
+  currentStroke = { color: strokeColor, size: strokeSize, points: [pos] };
+  ctx.beginPath();
+  ctx.moveTo(pos.x, pos.y);
 }
 
 function doDraw(e) {
   if (!drawing || !isDrawer) return;
+  ctx = canvas.getContext('2d'); // always re-get context
   const pos = getPos(e);
   currentStroke.points.push(pos);
   ctx.lineWidth = currentStroke.size;
   ctx.strokeStyle = currentStroke.color;
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   const pts = currentStroke.points;
   const l = pts.length;
   if (l >= 2) {
@@ -619,13 +632,15 @@ async function endDraw() {
 }
 
 function redrawStrokes() {
-  if (!ctx) return;
+  if (!canvas) return;
+  ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
   strokes.forEach(s => drawStroke(s));
 }
 
 function drawStroke(s) {
   if (!s) return;
+  ctx = canvas.getContext('2d');
   // Parse points — support both new string format and legacy object format
   let points;
   if (s.pts && typeof s.pts === 'string') {
@@ -1058,7 +1073,7 @@ function renderDrawing(data) {
         }
         document.getElementById('canvas-overlay').style.display = '';
         document.getElementById('canvas-overlay').innerHTML = `⏰ Time up! The word was: <strong>${word.w}</strong>`;
-        if (isHost) endRound();
+        if (isDrawer) endRound(); // drawer's timer end triggers round end
         return;
       }
       remaining--;
@@ -1209,7 +1224,7 @@ window.submitGuess = async function() {
     const correctIds = Object.values(allGuesses).filter(g => g.correct).map(g => g.playerId);
     if (nonDrawers.length > 0 && nonDrawers.every(id => correctIds.includes(id))) {
       clearInterval(timerInterval);
-      if (isHost) endRound();
+      if (isHost) endRound(); // host triggers round end when all guessed
     }
   }
 };
@@ -1236,38 +1251,19 @@ async function endRound() {
   const currentRound = data.currentRound || 0;
   const word = wordsArr.find(w => w.idx === currentRound) || wordsArr[currentRound];
   const wordStr = word ? word.w : '';
-  // First: set timedOut so ALL clients immediately disable guess input
-  // and reveal the word — BEFORE moving to rating
-  await update(roomRef, { timedOut: true, revealedWord: wordStr });
-  // Short delay so clients can react, then move to rating
-  setTimeout(async () => {
-    await update(roomRef, { state: 'rating', ratingStart: Date.now() });
-  }, 1500);
+  // Reveal word to all, go straight to roundresult — no rating step needed for flow
+  await update(roomRef, {
+    state: 'roundresult',
+    timedOut: true,
+    revealedWord: wordStr,
+    avgRating: 'N/A'
+  });
 }
 
-// ── RATING ───────────────────────────────────────────────────────────────────
+// ── RATING — shown after round result, optional ──────────────────────────────
 function showRatingOverlay(data) {
-  if (isDrawer) {
-    // Drawer skips rating — waits
-    document.getElementById('rating-overlay').classList.remove('show');
-    // Check if all ratings submitted
-    const players = data.players || {};
-    const drawOrderVals = data.drawOrder ? Object.values(data.drawOrder) : [];
-    const nonDrawers = Object.keys(players).filter(id=>id!==drawOrderVals[data.currentDrawerIdx % drawOrderVals.length]);
-    const ratings = data.ratings || {};
-    if (nonDrawers.every(id=>ratings[id]!==undefined) && isHost) {
-      proceedToRoundResult();
-    }
-    return;
-  }
-  if (data.ratings?.[myId] !== undefined) return; // already rated
-  const doVals = data.drawOrder ? Object.values(data.drawOrder) : [];
-  const drawerName = data.players?.[doVals[data.currentDrawerIdx % doVals.length]]?.name || 'the drawer';
-  document.getElementById('rating-prompt').textContent = `Rate ${drawerName}'s drawing!`;
-  document.getElementById('rating-overlay').classList.add('show');
-  selectedRating = 0;
-  document.querySelectorAll('.rating-star').forEach(s=>s.classList.remove('selected'));
-  document.getElementById('rating-submit-btn').disabled = true;
+  // Rating is now optional and happens on the round result screen
+  // This function is kept as a stub to avoid errors
 }
 
 window.selectRating = function(n) {
@@ -1319,29 +1315,57 @@ async function proceedToRoundResult() {
 function showRoundResult(data) {
   showScreen('result');
   clearInterval(timerInterval);
-  const word = data.words?.[data.currentRound];
-  document.getElementById('result-word').textContent = data.revealedWord || word?.w || '—';
+
+  const revealedWord = data.revealedWord || '';
+  document.getElementById('result-word').textContent = revealedWord || '—';
+
   const drawOrderArr2 = data.drawOrder ? Object.values(data.drawOrder) : [];
-  const drawerName = data.players?.[drawOrderArr2[data.currentDrawerIdx % drawOrderArr2.length]]?.name || '';
-  document.getElementById('result-drawer').textContent = `Drawn by ${drawerName} · ⭐ Avg rating: ${data.avgRating||'N/A'}`;
-  document.getElementById('host-next-ctrl').style.display = isHost ? '' : 'none';
-  document.getElementById('result-wait-msg').style.display = isHost ? 'none' : '';
+  const currentDrawerIdx = data.currentDrawerIdx || 0;
+  const drawerIdNow = drawOrderArr2[currentDrawerIdx % drawOrderArr2.length];
+  const drawerName = data.players?.[drawerIdNow]?.name || '';
+  document.getElementById('result-drawer').textContent = `Drawn by ${drawerName}`;
+
+  // The drawer sees the "Next Player →" button; everyone else waits
+  // Only the drawer (who is also typically the host, or anyone) can advance
+  const amDrawer = myId === drawerIdNow;
+  document.getElementById('host-next-ctrl').style.display = amDrawer ? '' : 'none';
+  document.getElementById('result-wait-msg').style.display = amDrawer ? 'none' : '';
+
+  // Show rating stars for non-drawers
+  const ratingArea = document.getElementById('result-rating-area');
+  if (ratingArea) {
+    if (!amDrawer && data.myRating === undefined) {
+      ratingArea.style.display = '';
+    } else {
+      ratingArea.style.display = 'none';
+    }
+  }
+
   // Render scoreboard
   const scores = data.scores || {};
   const sorted = Object.values(scores).sort((a,b)=>b.score-a.score);
-  const max = sorted[0]?.score||1;
+  const max = sorted[0]?.score || 1;
   const list = document.getElementById('scoreboard');
   list.innerHTML = '';
   sorted.forEach((s,i)=>{
     const div = document.createElement('div'); div.className='score-row';
     const rankCls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
     div.innerHTML=`<div class="rank-num ${rankCls}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
-      <div class="player-info"><div class="player-name">${s.name}</div><div class="team-tag ${s.team}">${s.team?.toUpperCase()} TEAM</div>
-      <div class="score-bar"><div class="score-bar-fill ${s.team}" style="width:${s.score/max*100}%"></div></div></div>
+      <div class="player-info"><div class="player-name">${s.name}</div><div class="team-tag ${s.team||''}">${(s.team||'').toUpperCase()} TEAM</div>
+      <div class="score-bar"><div class="score-bar-fill ${s.team||''}" style="width:${max>0?s.score/max*100:0}%"></div></div></div>
       <div class="pts">${s.score}</div>`;
     list.appendChild(div);
   });
 }
+
+window.quickRate = async function(n) {
+  document.querySelectorAll('#result-stars .rating-star').forEach((s,i) => {
+    s.style.filter = i < n ? 'none' : 'grayscale(1) opacity(.4)';
+  });
+  await update(ref(db, `${roomPath}/ratings/${myId}`), n);
+  document.getElementById('result-rating-area').style.display = 'none';
+  showToast('Rating submitted!');
+};
 
 window.nextRound = async function() {
   const snap = await get(roomRef);
