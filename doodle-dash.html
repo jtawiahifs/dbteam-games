@@ -790,7 +790,7 @@ window.joinTeam = async function(team) {
 
 // ── SUBSCRIBE ────────────────────────────────────────────────────────────────
 function subscribeRoom() {
-  onValue(roomRef, snap => {
+  onValue(roomRef, async snap => {
     const data = snap.val();
     if (!data) return;
     if (data.hostId === myId && !isHost) becomeHost();
@@ -804,6 +804,11 @@ function subscribeRoom() {
     if (me) { myTeam = me.team; }
     if (data.state==='lobby') renderLobby(data);
     if (data.state==='drawing') renderDrawing(data);
+    // allGuessed flag: drawer stops their timer and triggers endRound
+    if (data.allGuessed && data.state === 'drawing' && isDrawer) {
+      clearInterval(timerInterval);
+      await endRound();
+    }
     // When host sets timedOut, immediately disable guessing for everyone
     if (data.timedOut && data.state==='drawing' && !isDrawer) {
       const guessInput = document.getElementById('guess-input');
@@ -1154,12 +1159,12 @@ window.submitGuess = async function() {
   const data = snap.val();
   if (data.state !== 'drawing') return;
 
-  // Fix: Firebase words keyed by string — find by idx field
-  const wordsObj = data.words || {};
-  const wordsArr = Object.values(wordsObj);
+  // Get current word — words stored as object, find by position
+  const wordsArr = data.words ? Object.values(data.words) : [];
   const currentRound = data.currentRound || 0;
-  const word = wordsArr.find(w => w.idx === currentRound) || wordsArr[currentRound];
-  if (!word) return;
+  // words were stored with String(i) keys so index 0="0", try multiple approaches
+  const word = wordsArr[currentRound] || Object.values(data.words || {})[currentRound];
+  if (!word || !word.w) return;
 
   // Prevent double submission
   const guesses = data.guesses || {};
@@ -1172,12 +1177,11 @@ window.submitGuess = async function() {
   let pts = 0;
 
   if (correct) {
-    const correctCount = Object.values(guesses).filter(g => g.correct).length;
+    const correctSoFar = Object.values(guesses).filter(g => g.correct).length;
     const timeBonus = Math.max(0, drawTime - elapsed);
-    pts = Math.round(500 + (timeBonus / drawTime) * 500) - (correctCount * 50);
+    pts = Math.round(500 + (timeBonus / drawTime) * 500) - (correctSoFar * 50);
     pts = Math.max(100, pts);
     hasGuessedCorrectly = true;
-    // Immediately reveal word in blanks for this player
     document.getElementById('word-blanks').textContent = word.w;
     document.getElementById('guess-input').disabled = true;
     document.getElementById('canvas-overlay').style.display = '';
@@ -1185,14 +1189,14 @@ window.submitGuess = async function() {
     showFloatingPoint('+' + pts, '#06d6a0');
   } else {
     wrongGuessCount++;
-    const penalty = data.settings?.penalty || 0;
+    const penalty = Number(data.settings?.penalty) || 0;
     if (penalty > 0) {
       pts = -penalty;
       showFloatingPoint('-' + penalty, '#e94560');
     }
   }
 
-  // Write guess
+  // Write guess to Firebase
   const guessKey = Date.now().toString() + '_' + myId.slice(-4);
   await update(ref(db, `${roomPath}/guesses/${guessKey}`), {
     playerId: myId, name: myName,
@@ -1200,76 +1204,81 @@ window.submitGuess = async function() {
     correct, pts, time: Date.now()
   });
 
-  // Update scores using fresh reads to avoid stale data
+  // ── SCORING: single transaction-style update ──────────────────────────────
   if (pts !== 0) {
-    // Player score
-    const freshPlayerSnap = await get(ref(db, `${roomPath}/scores/${myId}/score`));
-    const currentScore = Number(freshPlayerSnap.val()) || 0;
-    const newScore = Math.max(0, currentScore + pts);
-    await update(ref(db, `${roomPath}/scores/${myId}`), { score: newScore });
+    // Get current scores from Firebase fresh
+    const scoresSnap = await get(ref(db, `${roomPath}/scores`));
+    const currentScores = scoresSnap.val() || {};
 
-    // Team score — get player's team from scores entry (most reliable)
-    const playerScoreSnap = await get(ref(db, `${roomPath}/scores/${myId}/team`));
-    const playerTeam = String(playerScoreSnap.val() || myTeam || '');
+    // My score
+    const myCurrentScore = Number(currentScores[myId]?.score) || 0;
+    const myNewScore = Math.max(0, myCurrentScore + pts);
+
+    // Figure out my team from the scores entry (reliable)
+    const playerTeam = String(currentScores[myId]?.team || myTeam || '');
+
+    // Build single update object
+    const scoreUpdates = {};
+    scoreUpdates[`scores/${myId}/score`] = myNewScore;
+
+    // Team total
     if (playerTeam === 'red' || playerTeam === 'blue') {
       const teamKey = playerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
-      const freshTeamSnap = await get(ref(db, `${roomPath}/${teamKey}`));
-      const currentTeamScore = Number(freshTeamSnap.val()) || 0;
-      const newTeamScore = Math.max(0, currentTeamScore + pts);
-      await update(ref(db, `${roomPath}`), { [teamKey]: newTeamScore });
+      const currentTeamScore = Number(data[teamKey]) || 0;
+      scoreUpdates[teamKey] = Math.max(0, currentTeamScore + pts);
     }
+
+    // If correct, drawer also earns +50
+    if (correct) {
+      const drawerVals = Object.values(data.drawOrder || {});
+      const drawerKey = drawerVals[data.currentDrawerIdx % drawerVals.length];
+      if (drawerKey && drawerKey !== myId && currentScores[drawerKey]) {
+        const drawerCurrentScore = Number(currentScores[drawerKey].score) || 0;
+        scoreUpdates[`scores/${drawerKey}/score`] = drawerCurrentScore + 50;
+        // Drawer team score
+        const drawerTeam = String(currentScores[drawerKey].team || '');
+        if (drawerTeam === 'red' || drawerTeam === 'blue') {
+          const dtKey = drawerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+          // Only add if we haven't already set it above for the same team
+          const existingTeamVal = scoreUpdates[dtKey] !== undefined
+            ? scoreUpdates[dtKey]
+            : Number(data[dtKey]) || 0;
+          scoreUpdates[dtKey] = existingTeamVal + 50;
+        }
+      }
+    }
+
+    // Write all score changes in one update call
+    await update(ref(db, roomPath), scoreUpdates);
   }
 
+  // ── CHECK IF ALL NON-DRAWERS HAVE GUESSED CORRECTLY ──────────────────────
   if (correct) {
-    // Drawer earns +50 pts per correct guesser — fresh read
-    const drawerKey = Object.values(data.drawOrder)[data.currentDrawerIdx % Object.values(data.drawOrder).length];
-    if (drawerKey && drawerKey !== myId) {
-      const freshDrawerSnap = await get(ref(db, `${roomPath}/scores/${drawerKey}/score`));
-      const drawerCurrentScore = Number(freshDrawerSnap.val()) || 0;
-      await update(ref(db, `${roomPath}/scores/${drawerKey}`), { score: drawerCurrentScore + 50 });
-      // Also add to drawer's team score
-      const drawerTeamSnap = await get(ref(db, `${roomPath}/scores/${drawerKey}/team`));
-      const drawerTeam = String(drawerTeamSnap.val() || '');
-      if (drawerTeam === 'red' || drawerTeam === 'blue') {
-        const dtKey = drawerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
-        const freshDtSnap = await get(ref(db, `${roomPath}/${dtKey}`));
-        await update(ref(db, `${roomPath}`), { [dtKey]: (Number(freshDtSnap.val()) || 0) + 50 });
-      }
-    }
+    // Re-fetch fresh state after all writes
+    const freshSnap = await get(roomRef);
+    const freshData = freshSnap.val();
+    if (freshData.state !== 'drawing') return; // already ended
 
-    // Streak bonus
-    if (myTeam === 'red' || myTeam === 'blue') {
-      const streakKey = myTeam === 'red' ? 'redStreak' : 'blueStreak';
-      const freshStreakSnap = await get(ref(db, `${roomPath}/${streakKey}`));
-      const newStreak = (Number(freshStreakSnap.val()) || 0) + 1;
-      const streakAt = data.settings?.streakAt || 0;
-      await update(ref(db, `${roomPath}`), { [streakKey]: newStreak });
-      if (streakAt > 0 && newStreak >= streakAt) {
-        const bonusPts = streakAt >= 5 ? 300 : 150;
-        const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
-        const freshBonusSnap = await get(ref(db, `${roomPath}/${teamKey}`));
-        await update(ref(db, `${roomPath}`), {
-          [teamKey]: (Number(freshBonusSnap.val()) || 0) + bonusPts,
-          [streakKey]: 0
-        });
-        showToast(`🔥 ${myTeam.toUpperCase()} STREAK +${bonusPts}pts!`);
-      }
-    }
+    const drawerVals = Object.values(freshData.drawOrder || {});
+    const drawerIdNow = drawerVals[(freshData.currentDrawerIdx || 0) % drawerVals.length];
 
-    // Check if ALL scored players (non-drawers) have guessed correctly
-    // Use scores keys (team players only) not players keys (includes teamless host)
-    const freshSnap2 = await get(roomRef);
-    const freshData = freshSnap2.val();
-    const drawerIdNow = Object.values(freshData.drawOrder || {})[freshData.currentDrawerIdx % Object.values(freshData.drawOrder || {}).length];
-    const scoredPlayers = Object.keys(freshData.scores || {});
-    const nonDrawerScored = scoredPlayers.filter(id => id !== drawerIdNow);
+    // Use scores keys (team players only, excludes teamless host)
+    const scoredPlayerIds = Object.keys(freshData.scores || {});
+    const nonDrawerIds = scoredPlayerIds.filter(id => id !== drawerIdNow);
+
     const freshGuesses = freshData.guesses || {};
-    const correctIds = Object.values(freshGuesses).filter(g => g.correct).map(g => g.playerId);
-    const allGuessed = nonDrawerScored.length > 0 && nonDrawerScored.every(id => correctIds.includes(id));
-    if (allGuessed) {
+    const correctPlayerIds = Object.values(freshGuesses)
+      .filter(g => g.correct)
+      .map(g => g.playerId);
+
+    const allDone = nonDrawerIds.length > 0 &&
+      nonDrawerIds.every(id => correctPlayerIds.includes(id));
+
+    if (allDone) {
       clearInterval(timerInterval);
       showToast('🎉 Everyone guessed it!');
-      await endRound();
+      // Write allGuessed flag — anyone can trigger endRound this way
+      await update(ref(db, roomPath), { allGuessed: true });
     }
   }
 };
@@ -1438,6 +1447,7 @@ window.nextRound = async function() {
     hintBlanks: '',
     revealedWord: '',
     timedOut: false,
+    allGuessed: false,
     roundStartTime: Date.now(),
   });
 };
