@@ -763,7 +763,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, update, get, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 let db, roomRef, myId, myName, isHost = false;
 let timerInterval, gameSettings = { rounds: 8, secs: 30 };
@@ -860,7 +860,19 @@ window.joinRoom = async function() {
     roomRef = ref(db, 'wordchain/' + room);
     myName = name;
     myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-    await update(ref(db, `wordchain/${room}/players/${myId}`), { name, joinedAt: Date.now(), score: 0 });
+    // Check for duplicate name
+    const existingSnap = await get(ref(db, `wordchain/${room}/players`));
+    const existingPlayers = existingSnap.val() || {};
+    const nameTaken = Object.values(existingPlayers).some(
+      p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (nameTaken) { showToast(`"${name}" is already taken — choose a different name`); return; }
+
+    const playerRef = ref(db, `wordchain/${room}/players/${myId}`);
+    await update(playerRef, { name, joinedAt: Date.now(), score: 0 });
+    // Remove player automatically on disconnect
+    onDisconnect(playerRef).remove();
+
     const snap = await get(roomRef);
     const data = snap.val();
     if (!data?.state) await update(roomRef, { state: 'lobby' });

@@ -502,7 +502,7 @@ canvas{display:block;touch-action:none;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, update, get, onValue, remove, push } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, update, get, onValue, remove, push, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 // ── STATE ───────────────────────────────────────────────────────────────────
 let db, roomRef, roomPath, myId, myName, myTeam=null, isHost=false, isDrawer=false;
@@ -704,10 +704,30 @@ window.joinRoom = async function() {
     db = getDatabase(app);
     roomPath = 'doodle/' + room;
     roomRef = ref(db, roomPath);
-    myName = name; myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
-    await update(ref(db, `${roomPath}/players/${myId}`), { name, joinedAt: Date.now(), team: null, score: 0 });
+
+    // ── Check for duplicate name ──────────────────────────────────────────
+    const existingSnap = await get(ref(db, `${roomPath}/players`));
+    const existingPlayers = existingSnap.val() || {};
+    const nameTaken = Object.values(existingPlayers).some(
+      p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (nameTaken) {
+      showToast(`"${name}" is already taken — choose a different name`);
+      return;
+    }
+
+    myName = name;
+    myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+
+    const playerRef = ref(db, `${roomPath}/players/${myId}`);
+    await update(playerRef, { name, joinedAt: Date.now(), team: null, score: 0 });
+
+    // ── Remove player from Firebase automatically when they disconnect ────
+    onDisconnect(playerRef).remove();
+
     const snap = await get(roomRef);
     if (!snap.val()?.state) await update(roomRef, { state: 'lobby' });
+
     isHost = false;
     document.getElementById('sb-name').textContent = name;
     document.getElementById('sb-role').textContent = 'No team yet';

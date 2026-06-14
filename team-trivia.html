@@ -782,7 +782,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, update, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 let db, roomRef, myId, myName, isHost = false, currentQuestions = [], editingIndex = -1;
 let timerInterval, timerStart, timerDuration = 20;
@@ -1328,15 +1328,18 @@ window.joinRoom = async function() {
     myName = name;
     myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
 
-    // Remove any stale entries with the same name (from a previous session)
+    // Check for duplicate name
     const existingSnap = await get(ref(db, `trivia/${room}/players`));
     const existingPlayers = existingSnap.val() || {};
-    for (const [existingId, existingPlayer] of Object.entries(existingPlayers)) {
-      if (existingPlayer.name === name && existingId !== myId) {
-        await update(ref(db, `trivia/${room}/players/${existingId}`), null);
-      }
-    }
-    await update(ref(db, `trivia/${room}/players/${myId}`), { name, joinedAt: Date.now() });
+    const nameTaken = Object.values(existingPlayers).some(
+      p => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+    );
+    if (nameTaken) { showToast(`"${name}" is already taken — choose a different name`); return; }
+
+    const playerRef = ref(db, `trivia/${room}/players/${myId}`);
+    await update(playerRef, { name, joinedAt: Date.now() });
+    // Remove player automatically on disconnect
+    onDisconnect(playerRef).remove();
 
     // Ensure room state exists
     const snap = await get(roomRef);
