@@ -649,9 +649,7 @@ window.clearCanvas = async function() {
   if (!isDrawer) return;
   strokes = [];
   ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  // Remove all strokes from Firebase
-  const { remove: removeRef } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-  await removeRef(ref(db, `${roomPath}/strokes`));
+  await remove(ref(db, `${roomPath}/strokes`));
 };
 window.fillCanvas = function() {
   if (!isDrawer) return;
@@ -1254,7 +1252,8 @@ function showRatingOverlay(data) {
     document.getElementById('rating-overlay').classList.remove('show');
     // Check if all ratings submitted
     const players = data.players || {};
-    const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
+    const drawOrderVals = data.drawOrder ? Object.values(data.drawOrder) : [];
+    const nonDrawers = Object.keys(players).filter(id=>id!==drawOrderVals[data.currentDrawerIdx % drawOrderVals.length]);
     const ratings = data.ratings || {};
     if (nonDrawers.every(id=>ratings[id]!==undefined) && isHost) {
       proceedToRoundResult();
@@ -1262,7 +1261,8 @@ function showRatingOverlay(data) {
     return;
   }
   if (data.ratings?.[myId] !== undefined) return; // already rated
-  const drawerName = data.players?.[data.drawOrder?.[data.currentDrawerIdx%data.drawOrder.length]]?.name || 'the drawer';
+  const doVals = data.drawOrder ? Object.values(data.drawOrder) : [];
+  const drawerName = data.players?.[doVals[data.currentDrawerIdx % doVals.length]]?.name || 'the drawer';
   document.getElementById('rating-prompt').textContent = `Rate ${drawerName}'s drawing!`;
   document.getElementById('rating-overlay').classList.add('show');
   selectedRating = 0;
@@ -1287,11 +1287,12 @@ window.submitRating = async function() {
   const snap = await get(roomRef);
   const data = snap.val();
   const players = data.players || {};
-  const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
+  const doArr = data.drawOrder ? Object.values(data.drawOrder) : [];
+  const nonDrawers = Object.keys(players).filter(id=>id!==doArr[data.currentDrawerIdx % doArr.length]);
   const ratings = data.ratings || {};
   if (nonDrawers.every(id=>ratings[id]!==undefined) && isHost) proceedToRoundResult();
-  // Auto-proceed after 15s even if not everyone rated
-  setTimeout(async()=>{ if(isHost){const s2=await get(roomRef);if(s2.val()?.state==='rating')proceedToRoundResult();} }, 15000);
+  // Auto-proceed after 8s if not everyone has rated
+  setTimeout(async()=>{ if(isHost){const s2=await get(roomRef);if(s2.val()?.state==='rating')proceedToRoundResult();} }, 8000);
 };
 
 async function proceedToRoundResult() {
@@ -1308,7 +1309,10 @@ async function proceedToRoundResult() {
     await update(ref(db,`${roomPath}/scores/${drawerKey}/score`), currentScore+100);
     showToast('⭐ High rated drawing! Drawer +100pts');
   }
-  await update(roomRef, { state:'roundresult', avgRating, ratings:null });
+  // Use remove() for ratings instead of null (Firebase rejects null values)
+  const { remove: rmRatings } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  await rmRatings(ref(db, `${roomPath}/ratings`));
+  await update(roomRef, { state: 'roundresult', avgRating });
 }
 
 // ── ROUND RESULT ─────────────────────────────────────────────────────────────
@@ -1354,9 +1358,8 @@ window.nextRound = async function() {
   lastDrawingRound = -1; // force full UI re-render for new round
   strokes = [];
   // Remove stale strokes and guesses from Firebase
-  const { remove: rm } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-  await rm(ref(db, `${roomPath}/strokes`));
-  await rm(ref(db, `${roomPath}/guesses`));
+  await remove(ref(db, `${roomPath}/strokes`));
+  await remove(ref(db, `${roomPath}/guesses`));
   await update(roomRef, {
     state: 'drawing',
     currentRound: nextRound,
@@ -1465,7 +1468,6 @@ window.exitGame = async function() {
   if (!confirm('Exit the game? You will be removed from the room.')) return;
   try {
     await remove(ref(db, `${roomPath}/players/${myId}`));
-    // If we were host, clear hostId
     const snap = await get(roomRef);
     if (snap.val()?.hostId === myId) await update(roomRef, { hostId: '' });
   } catch(e) { /* best effort */ }
@@ -1473,12 +1475,19 @@ window.exitGame = async function() {
 };
 
 function showScreen(name) {
-  currentScreen=name;
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(name+'-screen').classList.add('active');
-  // Show exit button on all screens except setup
+  currentScreen = name;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
   const exitBtn = document.getElementById('exit-btn');
   if (exitBtn) exitBtn.style.display = name === 'setup' ? 'none' : '';
+  // When game screen becomes visible, resize canvas and rebuild colour grid
+  // (canvas has 0 width until visible in DOM)
+  if (name === 'game') {
+    requestAnimationFrame(() => {
+      resizeCanvas();
+      buildColorGrid();
+    });
+  }
 }
 function showToast(msg) {
   const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
