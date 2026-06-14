@@ -1321,24 +1321,22 @@ function showRoundResult(data) {
 
   const drawOrderArr2 = data.drawOrder ? Object.values(data.drawOrder) : [];
   const currentDrawerIdx = data.currentDrawerIdx || 0;
-  const drawerIdNow = drawOrderArr2[currentDrawerIdx % drawOrderArr2.length];
+  const drawerIdNow = drawOrderArr2[currentDrawerIdx % Math.max(drawOrderArr2.length, 1)];
   const drawerName = data.players?.[drawerIdNow]?.name || '';
   document.getElementById('result-drawer').textContent = `Drawn by ${drawerName}`;
 
-  // The drawer sees the "Next Player →" button; everyone else waits
-  // Only the drawer (who is also typically the host, or anyone) can advance
-  const amDrawer = myId === drawerIdNow;
+  // Set isDrawer from data (works even if page was refreshed)
+  if (drawerIdNow) isDrawer = (String(myId).trim() === String(drawerIdNow).trim());
+  const amDrawer = isDrawer;
+
   document.getElementById('host-next-ctrl').style.display = amDrawer ? '' : 'none';
   document.getElementById('result-wait-msg').style.display = amDrawer ? 'none' : '';
 
-  // Show rating stars for non-drawers
+  // Show rating stars for non-drawers who haven't rated yet this round
   const ratingArea = document.getElementById('result-rating-area');
   if (ratingArea) {
-    if (!amDrawer && data.myRating === undefined) {
-      ratingArea.style.display = '';
-    } else {
-      ratingArea.style.display = 'none';
-    }
+    const alreadyRated = data.ratings?.[myId] !== undefined;
+    ratingArea.style.display = (!amDrawer && !alreadyRated) ? '' : 'none';
   }
 
   // Render scoreboard
