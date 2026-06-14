@@ -794,58 +794,81 @@ function pickWords(settings, count) {
 
 // ── START GAME ───────────────────────────────────────────────────────────────
 window.startGame = async function() {
-  const snap = await get(roomRef);
-  const data = snap.val();
-  const players = data.players || {};
-  const redPlayers = Object.values(players).filter(p=>p.team==='red');
-  const bluePlayers = Object.values(players).filter(p=>p.team==='blue');
-  if (!redPlayers.length || !bluePlayers.length) { showToast('Both teams need players'); return; }
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = true;
+  startBtn.textContent = '⏳ Starting…';
 
-  const rounds = parseInt(document.getElementById('s-rounds').value)||8;
-  const drawTime = parseInt(document.getElementById('s-time').value)||90;
-  const difficulty = document.getElementById('s-difficulty').value;
-  const penalty = parseInt(document.getElementById('s-penalty').value)||0;
-  const streakAt = parseInt(document.getElementById('s-streak').value)||0;
-  const isCustom = document.getElementById('wm-custom').classList.contains('active');
-  const customWords = isCustom ? parseCustomWords() : [];
+  try {
+    const snap = await get(roomRef);
+    const data = snap.val();
+    const players = data.players || {};
+    const redPlayers = Object.values(players).filter(p=>p.team==='red');
+    const bluePlayers = Object.values(players).filter(p=>p.team==='blue');
+    if (!redPlayers.length || !bluePlayers.length) {
+      showToast('Both teams need at least 1 player');
+      startBtn.disabled = false;
+      startBtn.textContent = '🎨 Start Drawing!';
+      return;
+    }
 
-  // Settings stored in Firebase must NOT contain arrays (Firebase can't store them reliably)
-  const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom: isCustom };
+    const rounds = parseInt(document.getElementById('s-rounds').value)||8;
+    const drawTime = parseInt(document.getElementById('s-time').value)||90;
+    const difficulty = document.getElementById('s-difficulty').value;
+    const penalty = parseInt(document.getElementById('s-penalty').value)||0;
+    const streakAt = parseInt(document.getElementById('s-streak').value)||0;
+    const isCustom = document.getElementById('wm-custom').classList.contains('active');
+    const customWords = isCustom ? parseCustomWords() : [];
 
-  // Build draw order
-  const allPlayers = Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
-  const drawOrder = allPlayers.map(([id])=>id);
+    // Settings — NO arrays, NO nulls (Firebase rejects them)
+    const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom: isCustom };
 
-  // Pick words locally (using customWords array) before writing to Firebase
-  const localSettings = { ...settings, customWords };
-  const words = pickWords(localSettings, rounds * drawOrder.length + 5);
+    // Build draw order
+    const allPlayers = Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+    const drawOrder = allPlayers.map(([id])=>id);
 
-  const scoresObj = {};
-  allPlayers.forEach(([id,p])=>{ scoresObj[id] = { name:p.name, team:p.team, score:0 }; });
+    // Pick words locally, convert to Firebase-safe object
+    const localSettings = { ...settings, customWords };
+    const wordsList = pickWords(localSettings, rounds * drawOrder.length + 5);
+    if (!wordsList.length) {
+      showToast('No words available — check difficulty settings');
+      startBtn.disabled = false;
+      startBtn.textContent = '🎨 Start Drawing!';
+      return;
+    }
 
-  // Convert to Firebase-safe indexed objects (no raw arrays)
-  const wordsObj = {};
-  words.forEach((e,i) => { wordsObj[i] = { w: e.w, d: e.d, idx: i }; });
-  const drawOrderObj = {};
-  drawOrder.forEach((id,i) => { drawOrderObj[i] = id; });
+    // Build Firebase-safe objects (NO null values, NO arrays)
+    const wordsObj = {};
+    wordsList.forEach((e,i) => { wordsObj[String(i)] = { w: String(e.w), d: String(e.d||'medium') }; });
 
-  await update(roomRef, {
-    state: 'drawing',
-    settings,
-    drawOrder: drawOrderObj,
-    words: wordsObj,
-    currentRound: 0,
-    currentDrawerIdx: 0,
-    scores: scoresObj,
-    redTeamScore: 0,
-    blueTeamScore: 0,
-    redStreak: 0,
-    blueStreak: 0,
-    strokes: null,
-    guesses: null,
-    hintsUsed: 0,
-    roundStartTime: Date.now(),
-  });
+    const drawOrderObj = {};
+    drawOrder.forEach((id,i) => { drawOrderObj[String(i)] = String(id); });
+
+    const scoresObj = {};
+    allPlayers.forEach(([id,p]) => {
+      scoresObj[id] = { name: String(p.name||''), team: String(p.team||''), score: 0 };
+    });
+
+    await update(roomRef, {
+      state: 'drawing',
+      settings,
+      drawOrder: drawOrderObj,
+      words: wordsObj,
+      currentRound: 0,
+      currentDrawerIdx: 0,
+      scores: scoresObj,
+      redTeamScore: 0,
+      blueTeamScore: 0,
+      redStreak: 0,
+      blueStreak: 0,
+      hintsUsed: 0,
+      roundStartTime: Date.now(),
+    });
+
+  } catch(e) {
+    showToast('Error starting game: ' + e.message);
+    startBtn.disabled = false;
+    startBtn.textContent = '🎨 Start Drawing!';
+  }
 };
 
 // ── RENDER DRAWING ROUND ─────────────────────────────────────────────────────
@@ -1171,8 +1194,8 @@ window.nextRound = async function() {
   strokes=[];
   await update(roomRef, {
     state:'drawing', currentRound:nextRound, currentDrawerIdx:nextDrawerIdx,
-    strokes:null, guesses:null, hintsUsed:0, hintBlanks:null,
-    ratings:null, roundStartTime:Date.now(),
+    hintsUsed:0, hintBlanks:'',
+    ratings:'none', roundStartTime:Date.now(),
   });
 };
 
