@@ -922,9 +922,21 @@ window.startGame = async function() {
     // Settings — NO arrays, NO nulls (Firebase rejects them)
     const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom: isCustom };
 
-    // Build draw order
-    const allPlayers = Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
-    const drawOrder = allPlayers.map(([id])=>id);
+    // Only include players who have joined a team (red or blue)
+    // The host may not have a team — they still host but don't draw/guess
+    const teamPlayers = Object.entries(players)
+      .filter(([,p]) => p.team === 'red' || p.team === 'blue')
+      .sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
+
+    if (!teamPlayers.length) {
+      showToast('No players have joined a team yet');
+      startBtn.disabled = false;
+      startBtn.textContent = '🎨 Start Drawing!';
+      return;
+    }
+
+    // Build draw order from team players only
+    const drawOrder = teamPlayers.map(([id])=>id);
 
     // Pick words locally, convert to Firebase-safe object
     const localSettings = { ...settings, customWords };
@@ -943,9 +955,10 @@ window.startGame = async function() {
     const drawOrderObj = {};
     drawOrder.forEach((id,i) => { drawOrderObj[String(i)] = String(id); });
 
+    // Scores only for team players
     const scoresObj = {};
-    allPlayers.forEach(([id,p]) => {
-      scoresObj[id] = { name: String(p.name||''), team: String(p.team||''), score: 0 };
+    teamPlayers.forEach(([id,p]) => {
+      scoresObj[id] = { name: String(p.name||''), team: String(p.team), score: 0 };
     });
 
     await update(roomRef, {
@@ -1187,12 +1200,20 @@ window.submitGuess = async function() {
     correct, pts, time: Date.now()
   });
 
-  // Update this player's score
+  // Update this player's score — always re-fetch to avoid stale data
   if (pts !== 0) {
-    const currentScore = data.scores?.[myId]?.score || 0;
-    await update(ref(db, `${roomPath}/scores/${myId}/score`), Math.max(0, currentScore + pts));
-    const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
-    await update(ref(db, `${roomPath}/${teamKey}`), Math.max(0, (data[teamKey] || 0) + pts));
+    const freshSnap = await get(ref(db, `${roomPath}/scores/${myId}/score`));
+    const currentScore = freshSnap.val() || 0;
+    const newScore = Math.max(0, currentScore + pts);
+    await update(ref(db, `${roomPath}/scores/${myId}`), { score: newScore });
+    // Use player's stored team (myTeam set from Firebase) for team score
+    const playerTeam = myTeam || data.scores?.[myId]?.team || '';
+    if (playerTeam === 'red' || playerTeam === 'blue') {
+      const teamKey = playerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+      const freshTeamSnap = await get(ref(db, `${roomPath}/${teamKey}`));
+      const currentTeamScore = freshTeamSnap.val() || 0;
+      await update(ref(db, `${roomPath}`), { [teamKey]: Math.max(0, currentTeamScore + pts) });
+    }
   }
 
   if (correct) {
@@ -1398,43 +1419,76 @@ window.nextRound = async function() {
 function showFinalScreen(data) {
   showScreen('final');
   clearInterval(timerInterval);
-  const redScore = data.redTeamScore||0, blueScore = data.blueTeamScore||0;
+  const redScore = data.redTeamScore || 0;
+  const blueScore = data.blueTeamScore || 0;
+  const isDraw = redScore === blueScore;
+  const winnerTeam = redScore > blueScore ? 'red' : 'blue';
+  const loserTeam = winnerTeam === 'red' ? 'blue' : 'red';
+
+  // ── Banner ──
   const banner = document.getElementById('final-banner');
   const heading = document.getElementById('final-heading');
   const trophy = document.getElementById('final-trophy');
   const reason = document.getElementById('final-reason');
-  if (redScore > blueScore) {
-    banner.className='final-banner red'; heading.className='red'; heading.textContent='RED TEAM ARE THE WINNERS!!!';
-    trophy.textContent='🏆'; reason.textContent=`Red: ${redScore} pts · Blue: ${blueScore} pts`;
-  } else if (blueScore > redScore) {
-    banner.className='final-banner blue'; heading.className='blue'; heading.textContent='BLUE TEAM ARE THE WINNERS!!!';
-    trophy.textContent='🏆'; reason.textContent=`Blue: ${blueScore} pts · Red: ${redScore} pts`;
+  if (isDraw) {
+    banner.className = 'final-banner draw';
+    heading.className = 'draw';
+    heading.textContent = "IT'S A DRAW!!!";
+    trophy.textContent = '🤝';
+    reason.textContent = `Both teams scored ${redScore} pts!`;
   } else {
-    banner.className='final-banner draw'; heading.className='draw'; heading.textContent="IT'S A DRAW!!!";
-    trophy.textContent='🤝'; reason.textContent=`Both teams scored ${redScore} pts!`;
+    banner.className = `final-banner ${winnerTeam}`;
+    heading.className = winnerTeam;
+    heading.textContent = `${winnerTeam.toUpperCase()} TEAM ARE THE WINNERS!!!`;
+    trophy.textContent = '🏆';
+    reason.textContent = winnerTeam === 'red'
+      ? `Red: ${redScore} pts · Blue: ${blueScore} pts`
+      : `Blue: ${blueScore} pts · Red: ${redScore} pts`;
   }
-  // Hall of Fame
-  const scores = data.scores||{};
+
+  // ── Two-team podium (winner then loser, or both equal on draw) ──
+  const scores = data.scores || {};
   const allPlayers = Object.values(scores);
-  const topDrawer = allPlayers.reduce((best,p)=>p.score>=(best?.score||0)?p:best, null);
-  const guesses = data.guesses ? Object.values(data.guesses) : [];
-  const hof = document.getElementById('hof-grid');
-  hof.innerHTML=`
-    <div class="hof-card"><div class="hof-icon">🎨</div><div class="hof-label">Best Overall</div><div class="hof-winner">${topDrawer?.name||'—'}</div><div class="hof-desc">${topDrawer?.score||0} pts</div></div>
-    <div class="hof-card"><div class="hof-icon">⭐</div><div class="hof-label">Top Rated Drawing</div><div class="hof-winner">${data.topRatedDrawer||topDrawer?.name||'—'}</div><div class="hof-desc">By popular vote</div></div>`;
-  // Team cards
   const teamsEl = document.getElementById('final-teams');
-  const winner = redScore>=blueScore?'red':'blue';
-  const loser = winner==='red'?'blue':'red';
-  ['red','blue'].forEach(team=>{
-    const isWin = team===winner && redScore!==blueScore;
+  teamsEl.innerHTML = '';
+
+  const buildTeamCard = (team, isWinner) => {
+    const teamScore = team === 'red' ? redScore : blueScore;
+    const teamPlayers = allPlayers.filter(p => p.team === team).sort((a,b) => b.score - a.score);
+    const icon = isDraw ? '🤝' : isWinner ? '🏆' : '😔';
+    const label = isDraw ? `${team.toUpperCase()} TEAM — DRAW`
+                        : isWinner ? `${team.toUpperCase()} TEAM — WINNERS!!!`
+                                   : `${team.toUpperCase()} TEAM — BETTER LUCK NEXT TIME`;
     const card = document.createElement('div');
-    card.className=`final-team-card ${isWin?'win ':''} ${team}`;
-    const teamPlayers = allPlayers.filter(p=>p.team===team).sort((a,b)=>b.score-a.score);
-    card.innerHTML=`<div class="final-team-title ${team}">${isWin?'🏆':redScore===blueScore?'🤝':'😔'} ${team.toUpperCase()} TEAM</div>`+
-      teamPlayers.map(p=>`<div class="final-player-row">👤 ${p.name} <span style="margin-left:auto;color:var(--yellow);font-family:'Fredoka One',cursive">${p.score}pts</span></div>`).join('');
-    teamsEl.appendChild(card);
-  });
+    card.className = `final-team-card${isWinner && !isDraw ? ' win ' + team : ''}`;
+    card.innerHTML = `
+      <div class="final-team-title ${team}" style="font-size:1.2rem;margin-bottom:10px">${icon} ${label}</div>
+      <div style="font-family:'Fredoka One',cursive;font-size:2rem;color:var(--yellow);text-align:center;margin-bottom:12px">${teamScore} pts</div>
+      ${teamPlayers.map(p => `
+        <div class="final-player-row">
+          👤 ${p.name}
+          <span style="margin-left:auto;font-family:'Fredoka One',cursive;color:var(--yellow)">${p.score} pts</span>
+        </div>`).join('')}
+    `;
+    return card;
+  };
+
+  if (isDraw) {
+    teamsEl.appendChild(buildTeamCard('red', false));
+    teamsEl.appendChild(buildTeamCard('blue', false));
+  } else {
+    teamsEl.appendChild(buildTeamCard(winnerTeam, true));
+    teamsEl.appendChild(buildTeamCard(loserTeam, false));
+  }
+
+  // ── Hall of Fame ──
+  const topPlayer = allPlayers.sort((a,b) => b.score-a.score)[0];
+  const hof = document.getElementById('hof-grid');
+  hof.innerHTML = `
+    <div class="hof-card"><div class="hof-icon">🎨</div><div class="hof-label">Top Scorer</div>
+      <div class="hof-winner">${topPlayer?.name||'—'}</div><div class="hof-desc">${topPlayer?.score||0} pts</div></div>
+    <div class="hof-card"><div class="hof-icon">⭐</div><div class="hof-label">Top Rated Drawing</div>
+      <div class="hof-winner">${data.topRatedDrawer||topPlayer?.name||'—'}</div><div class="hof-desc">By popular vote</div></div>`;
 }
 
 window.playAgain = async function() {
