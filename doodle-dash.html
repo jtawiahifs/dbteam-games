@@ -753,6 +753,7 @@ function renderLobby(data) {
   if (isHost) {
     const canStart = redCount >= 1 && blueCount >= 1;
     document.getElementById('start-btn').disabled = !canStart;
+    document.getElementById('start-btn').style.display = '';
     document.getElementById('start-warn').style.display = canStart ? 'none' : '';
   }
 }
@@ -820,12 +821,21 @@ window.startGame = async function() {
   const scores = {};
   allPlayers.forEach(([id,p])=>{ scores[id] = { name:p.name, team:p.team, score:0, ratings:[], ratingsGiven:0 }; });
 
+  // Convert words array to indexed object for Firebase compatibility
+  const wordsObj = {};
+  words.forEach((e,i) => { wordsObj[i] = {...e, idx:i}; });
+  const drawOrderObj = {};
+  drawOrder.forEach((id,i) => { drawOrderObj[i] = id; });
+  const scoresObj = {};
+  Object.entries(scores).forEach(([id,s]) => { scoresObj[id] = s; });
+
   await update(roomRef, {
-    state:'drawing', settings, drawOrder, words: words.map((e,i)=>({...e,idx:i})),
+    state:'drawing', settings, drawOrder:drawOrderObj, words:wordsObj,
     currentRound:0, currentDrawerIdx:0,
-    scores, redTeamScore:0, blueTeamScore:0,
+    scores:scoresObj, redTeamScore:0, blueTeamScore:0,
     redStreak:0, blueStreak:0,
     strokes:null, guesses:null, hintsUsed:0,
+    roundStartTime: Date.now(),
   });
 };
 
@@ -835,8 +845,15 @@ function renderDrawing(data) {
   clearInterval(timerInterval);
   wrongGuessCount = 0; hasGuessedCorrectly = false;
 
-  const { settings, drawOrder, words, currentRound, currentDrawerIdx, scores, redTeamScore, blueTeamScore } = data;
-  const totalRounds = settings.rounds;
+  const settings = data.settings || {};
+  const drawOrder = data.drawOrder ? Object.values(data.drawOrder) : [];
+  const words = data.words ? Object.values(data.words) : [];
+  const currentRound = data.currentRound || 0;
+  const currentDrawerIdx = data.currentDrawerIdx || 0;
+  const scores = data.scores || {};
+  const redTeamScore = data.redTeamScore || 0;
+  const blueTeamScore = data.blueTeamScore || 0;
+  const totalRounds = settings.rounds || 8;
   const drawerIdInOrder = drawOrder[currentDrawerIdx % drawOrder.length];
   isDrawer = myId === drawerIdInOrder;
   const word = words[currentRound] || words[0];

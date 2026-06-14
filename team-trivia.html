@@ -1328,6 +1328,14 @@ window.joinRoom = async function() {
     myName = name;
     myId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
 
+    // Remove any stale entries with the same name (from a previous session)
+    const existingSnap = await get(ref(db, `trivia/${room}/players`));
+    const existingPlayers = existingSnap.val() || {};
+    for (const [existingId, existingPlayer] of Object.entries(existingPlayers)) {
+      if (existingPlayer.name === name && existingId !== myId) {
+        await update(ref(db, `trivia/${room}/players/${existingId}`), null);
+      }
+    }
     await update(ref(db, `trivia/${room}/players/${myId}`), { name, joinedAt: Date.now() });
 
     // Ensure room state exists
@@ -1606,52 +1614,73 @@ window.startGame = async function() {
     currentQ: 0,
     answers: null,
     revealed: false,
-    timerSecs: qTimer
+    timerSecs: qTimer,
+    roundStartTime: Date.now()
   });
 };
 
+let lastRenderedQ = -1; // track which question we last rendered to avoid timer restarts
+
 function loadQuestion(data) {
   showScreen('game');
-  clearInterval(timerInterval);
-  hasAnswered = false;
   const qi = data.currentQ;
   const q = currentQuestions[qi] || Object.values(data.questions || {})[qi];
   if (!q) return;
-  document.getElementById('round-badge').textContent = `Q ${qi+1} / ${currentQuestions.length}`;
-  document.getElementById('q-num-label').textContent = `QUESTION ${qi+1}`;
-  document.getElementById('q-text').textContent = q.q;
-  const grid = document.getElementById('answer-grid');
-  grid.innerHTML = '';
-  q.opts.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'answer-btn';
-    btn.innerHTML = `<span class="answer-letter">${LETTERS[i]}</span>${opt}`;
-    btn.onclick = () => submitAnswer(qi, i, q.correct);
-    grid.appendChild(btn);
-  });
-  document.getElementById('reveal-section').style.display = 'none';
-  document.getElementById('host-controls').style.display = isHost ? '' : 'none';
-  document.getElementById('next-btn').disabled = true;
-  const secs = data.timerSecs || 20;
-  startTimer(secs, () => {
-    if (isHost) revealAnswers();
-  });
+
+  // Only re-render question UI and restart timer if this is a NEW question
+  if (qi !== lastRenderedQ) {
+    lastRenderedQ = qi;
+    hasAnswered = false;
+    clearInterval(timerInterval);
+
+    document.getElementById('round-badge').textContent = `Q ${qi+1} / ${currentQuestions.length}`;
+    document.getElementById('q-num-label').textContent = `QUESTION ${qi+1}`;
+    document.getElementById('q-text').textContent = q.q;
+    const grid = document.getElementById('answer-grid');
+    grid.innerHTML = '';
+    q.opts.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'answer-btn';
+      btn.innerHTML = `<span class="answer-letter">${LETTERS[i]}</span>${opt}`;
+      btn.onclick = () => submitAnswer(qi, i, q.correct);
+      grid.appendChild(btn);
+    });
+    document.getElementById('reveal-section').style.display = 'none';
+    document.getElementById('host-controls').style.display = isHost ? '' : 'none';
+    document.getElementById('next-btn').disabled = true;
+
+    // Use server roundStartTime to calculate true remaining time
+    const secs = data.timerSecs || 20;
+    const elapsed = data.roundStartTime ? Math.floor((Date.now() - data.roundStartTime) / 1000) : 0;
+    const remaining = Math.max(0, secs - elapsed);
+    startTimer(remaining, secs, () => {
+      if (isHost) revealAnswers();
+    });
+  }
+
+  // Always update answer state (disable buttons if already answered)
+  if (data.answers?.[myId]) {
+    hasAnswered = true;
+    const btns = document.querySelectorAll('.answer-btn');
+    btns.forEach(b => b.disabled = true);
+  }
+
   updateAnswerProgress(data.answers || {}, data.players || {});
 }
 
-function startTimer(secs, onEnd) {
-  let remaining = secs;
-  timerDuration = secs;
+function startTimer(remaining, totalSecs, onEnd) {
+  timerDuration = totalSecs;
   const circumference = 175.9;
   const circle = document.getElementById('timer-circle');
   const numEl = document.getElementById('timer-num');
-  circle.style.strokeDashoffset = '0';
+  // Set ring position to reflect already-elapsed time
+  circle.style.strokeDashoffset = ((totalSecs - remaining) / totalSecs * circumference).toString();
   numEl.textContent = remaining;
-  numEl.style.color = 'var(--accent)';
+  numEl.style.color = remaining <= 5 ? 'var(--red)' : 'var(--accent)';
   timerInterval = setInterval(() => {
     remaining--;
     numEl.textContent = remaining;
-    circle.style.strokeDashoffset = ((secs - remaining) / secs * circumference).toString();
+    circle.style.strokeDashoffset = ((totalSecs - remaining) / totalSecs * circumference).toString();
     if (remaining <= 5) numEl.style.color = 'var(--red)';
     if (remaining <= 0) { clearInterval(timerInterval); onEnd && onEnd(); }
   }, 1000);
@@ -1659,15 +1688,20 @@ function startTimer(secs, onEnd) {
 
 async function submitAnswer(qi, answerIdx, correct) {
   if (hasAnswered) return;
+  // Immediately disable ALL buttons to prevent answer changes
+  const btns = document.querySelectorAll('.answer-btn');
+  btns.forEach(b => b.disabled = true);
   hasAnswered = true;
   answeredAt = Date.now();
   const timeBonus = Math.max(0, timerDuration - Math.floor((answeredAt - (timerStart || answeredAt)) / 1000));
   const pts = answerIdx === correct ? Math.round(400 + (timeBonus / timerDuration) * 600) : 0;
-  await update(ref(db, `${roomRef.toString().replace('https://','').split('/').slice(1).join('/')}/answers/${myId}`),
+  const snap = await get(roomRef);
+  const roomData = snap.val();
+  const roomKey = `trivia/${document.getElementById('room-name').value.trim()}`;
+  await update(ref(db, `${roomKey}/answers/${myId}`),
     { name: myName, answer: answerIdx, correct: answerIdx === correct, pts, time: answeredAt });
-  // Color selected button
-  const btns = document.querySelectorAll('.answer-btn');
-  btns.forEach((b,i) => { b.disabled = true; if(i===answerIdx) b.classList.add(answerIdx === correct ? 'correct' : 'selected'); });
+  // Highlight selected button
+  btns.forEach((b,i) => { if(i===answerIdx) b.classList.add(answerIdx === correct ? 'correct' : 'selected'); });
   showToast(answerIdx === correct ? `+${pts} pts!` : 'Wrong!');
 }
 
@@ -1706,6 +1740,7 @@ function showReveal(data) {
 }
 
 window.nextQuestion = async function() {
+  lastRenderedQ = -1; // allow next question to render fresh
   const snap = await get(roomRef);
   const data = snap.val();
   const qi = data.currentQ;
@@ -1720,12 +1755,12 @@ window.nextQuestion = async function() {
   if (qi + 1 >= total) {
     await update(roomRef, { state: 'final' });
   } else {
-    await update(roomRef, { state: 'scoreboard', scores, currentQ: qi + 1, answers: null });
+    await update(roomRef, { state: 'scoreboard', scores, currentQ: qi + 1, answers: null, roundStartTime: Date.now() });
   }
 };
 
 window.proceedFromScore = async function() {
-  await update(roomRef, { state: 'question' });
+  await update(roomRef, { state: 'question', roundStartTime: Date.now() });
 };
 
 function showScoreScreen(data) {

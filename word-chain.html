@@ -653,6 +653,22 @@
         <input type="number" id="setting-secs" min="15" max="60" value="30">
       </div>
     </div>
+    <div class="settings-row">
+      <div class="input-group">
+        <label>Difficulty Mode</label>
+        <select id="setting-mode" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:600;padding:11px 14px;width:100%">
+          <option value="easy">🟢 Easy — words stay visible</option>
+          <option value="hard">🔴 Hard — all words deleted when anyone submits</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Word Validation</label>
+        <select id="setting-validation" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--ink);font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:600;padding:11px 14px;width:100%">
+          <option value="none">None — accept any word</option>
+          <option value="dictionary" selected>Dictionary — validate via API</option>
+        </select>
+      </div>
+    </div>
 
     <div class="input-group" style="margin-bottom:8px">
       <label>Word Source</label>
@@ -773,10 +789,14 @@ const WORDS = [
 ];
 
 function pickWord(len, customList) {
-  // Use custom list if provided and non-empty
   const source = (customList && customList.length > 0) ? customList : WORDS;
-  const pool = source.filter(w => len ? w.length === len : true);
-  return pool.length ? pool[Math.floor(Math.random() * pool.length)].toUpperCase() : null;
+  // If no length specified, pick a random length from available words for variety
+  if (!len) {
+    const lengths = [...new Set(source.map(w => w.length))];
+    len = lengths[Math.floor(Math.random() * lengths.length)];
+  }
+  const pool = source.filter(w => w.length === len);
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].toUpperCase() : source[Math.floor(Math.random()*source.length)].toUpperCase();
 }
 
 window.setWordMode = function(mode) {
@@ -890,6 +910,11 @@ function subscribeRoom(room) {
     }
     if (data.state === 'round' && currentScreen !== 'game') showScreen('game');
     if (data.state === 'round') renderRound(data);
+    // Hard mode: if wipe signal changed, clear input for non-answered players
+    if (data.hardModeWipe && data.gameMode === 'hard' && !hasAnswered) {
+      const inputEl = document.getElementById('word-input');
+      if (inputEl && !inputEl.disabled) { inputEl.value = ''; }
+    }
     if (data.state === 'scoreboard') showScoreScreen(data);
     if (data.state === 'final') showFinalScreen(data);
     if (data.state === 'lobby' && currentScreen !== 'lobby') showScreen('lobby');
@@ -910,6 +935,8 @@ function renderPlayers(players, hostId) {
 window.startGame = async function() {
   const rounds = parseInt(document.getElementById('setting-rounds').value) || 8;
   const secs = parseInt(document.getElementById('setting-secs').value) || 30;
+  const gameMode = document.getElementById('setting-mode')?.value || 'easy';
+  const validation = document.getElementById('setting-validation')?.value || 'none';
   const isCustomMode = document.getElementById('wm-custom')?.classList.contains('active');
 
   let customWords = [];
@@ -933,6 +960,8 @@ window.startGame = async function() {
     submissions: null,
     customWords: isCustomMode ? customWords : null,
     usingCustomWords: isCustomMode,
+    gameMode,
+    validation,
   });
 };
 
@@ -959,7 +988,7 @@ function renderRound(data) {
   document.getElementById('host-round-ctrl').style.display = isHost ? '' : 'none';
 
   // Render feed
-  renderFeed(data.submissions || {});
+  renderFeed(data.submissions || {}, false);
 
   // Start countdown
   const elapsed = Math.floor((Date.now() - roundStartTime) / 1000);
@@ -975,15 +1004,44 @@ function renderRound(data) {
   }, 1000);
 }
 
-function renderFeed(subs) {
+function renderFeed(subs, roundOver) {
   const list = document.getElementById('feed-list');
   list.innerHTML = '';
-  Object.values(subs).sort((a,b) => b.pts - a.pts).forEach(s => {
+  const entries = Object.entries(subs);
+  if (entries.length === 0) return;
+  if (roundOver) {
+    // Show all after round ends
+    Object.values(subs).sort((a,b) => b.pts - a.pts).forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      div.innerHTML = `<span class="fi-word">${s.word}</span><span class="fi-name">${s.name}</span><span class="fi-pts">+${s.pts}</span>`;
+      list.appendChild(div);
+    });
+  } else {
+    // During round: show answered count but not words
+    const answeredCount = entries.length;
     const div = document.createElement('div');
     div.className = 'feed-item';
-    div.innerHTML = `<span class="fi-word">${s.word}</span><span class="fi-name">${s.name}</span><span class="fi-pts">+${s.pts}</span>`;
+    div.innerHTML = `<span class="fi-name" style="color:var(--accent)">✓ ${answeredCount} player${answeredCount!==1?'s':''} answered — words hidden until round ends</span>`;
     list.appendChild(div);
-  });
+    // Show own answer if submitted
+    const myEntry = Object.values(subs).find(s => s.name === myName);
+    if (myEntry) {
+      const myDiv = document.createElement('div');
+      myDiv.className = 'feed-item';
+      myDiv.innerHTML = `<span class="fi-word">${myEntry.word}</span><span class="fi-name">You</span><span class="fi-pts">+${myEntry.pts}</span>`;
+      list.appendChild(myDiv);
+    }
+  }
+}
+
+async function isRealWord(word) {
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
+    return res.ok;
+  } catch(e) {
+    return true; // if API fails, allow word
+  }
 }
 
 window.submitWord = async function() {
@@ -999,22 +1057,29 @@ window.submitWord = async function() {
   const errorEl = document.getElementById('error-msg');
 
   if (!val) return;
+  if (!/^[A-Z]+$/.test(val)) { errorEl.textContent = 'Letters only'; return; }
   if (val.length !== required.length) {
     errorEl.textContent = `Must be ${required.length} letters`;
-    input.classList.add('shake');
-    setTimeout(() => input.classList.remove('shake'), 400);
-    return;
+    input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); return;
   }
   if (val[0] !== required.letter) {
     errorEl.textContent = `Must start with "${required.letter}"`;
-    input.classList.add('shake');
-    setTimeout(() => input.classList.remove('shake'), 400);
-    return;
+    input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400); return;
   }
 
-  // Check against simple word list (allow anything that looks like a real word)
-  const isValid = /^[A-Z]+$/.test(val);
-  if (!isValid) { errorEl.textContent = 'Letters only'; return; }
+  // Dictionary validation
+  if (data.validation === 'dictionary') {
+    errorEl.textContent = '🔍 Checking dictionary…';
+    input.disabled = true;
+    const valid = await isRealWord(val);
+    input.disabled = false;
+    if (!valid) {
+      errorEl.textContent = `"${val}" is not a recognised word — try again!`;
+      input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400);
+      input.value = '';
+      return;
+    }
+  }
 
   hasAnswered = true;
   const elapsed = (Date.now() - roundStartTime) / 1000;
@@ -1026,6 +1091,11 @@ window.submitWord = async function() {
   const _room = document.getElementById('room-name').value.trim();
   await update(ref(db, `wordchain/${_room}/submissions/${myId}`), { name: myName, word: val, pts, time: Date.now() });
   showToast(`+${pts} pts!`);
+
+  // Hard mode: delete everyone else's input field value (signal via Firebase)
+  if (data.gameMode === 'hard') {
+    await update(ref(db, `wordchain/${_room}`), { hardModeWipe: Date.now() });
+  }
 };
 
 // Handle Enter key
@@ -1040,9 +1110,9 @@ window.endRound = async function() {
   Object.values(subs).forEach(s => { scores[s.name] = (scores[s.name] || 0) + s.pts; });
   const nextRoundNum = (data.currentRound || 1) + 1;
   if (nextRoundNum > (data.totalRounds || 8)) {
-    await update(roomRef, { state: 'final', scores });
+    await update(roomRef, { state: 'final', scores, lastSubmissions: subs });
   } else {
-    await update(roomRef, { state: 'scoreboard', scores });
+    await update(roomRef, { state: 'scoreboard', scores, lastSubmissions: subs });
   }
 };
 
@@ -1065,6 +1135,8 @@ window.nextRound = async function() {
 function showScoreScreen(data) {
   showScreen('score');
   clearInterval(timerInterval);
+  // Now reveal all words in the feed
+  renderFeed(data.lastSubmissions || data.submissions || {}, true);
   renderScoreList(data.scores || {}, 'score-list');
 }
 

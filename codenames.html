@@ -534,6 +534,50 @@
     .settings-row { grid-template-columns: 1fr 1fr; }
     .game-footer { grid-template-columns: 1fr; }
   }
+  /* Operatives chat */
+  .op-chat-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+  .op-chat-panel.red { border-top: 2px solid var(--red); }
+  .op-chat-panel.blue { border-top: 2px solid var(--blue); }
+  .op-chat-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 8px 12px 4px;
+  }
+  .op-chat-title.red { color: var(--red); }
+  .op-chat-title.blue { color: var(--blue); }
+  .op-chat-messages {
+    flex: 1;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 120px;
+    overflow-y: auto;
+    min-height: 60px;
+  }
+  .op-chat-msg { font-size: 0.78rem; line-height: 1.4; }
+  .op-chat-msg .msg-name { font-weight: 700; }
+  .op-chat-msg .msg-name.red { color: var(--red); }
+  .op-chat-msg .msg-name.blue { color: var(--blue); }
+  .op-chat-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border);
+  }
+  .op-chat-input-row input { flex: 1; font-size: 0.82rem; padding: 7px 10px; }
+  .op-chat-input-row button { padding: 7px 12px; font-size: 0.78rem; }
   .reset-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(0,0,0,.85); z-index: 300;
@@ -787,6 +831,26 @@
       <div id="game-player-list" style="display:flex;flex-direction:column;gap:5px;font-size:0.82rem;max-height:140px;overflow-y:auto"></div>
     </div>
   </div>
+
+  <!-- Operatives-only team chat (hidden from Spymasters) -->
+  <div id="op-chat-area" class="w100" style="display:none">
+    <div class="op-chat-panel red" id="red-chat-panel" style="display:none">
+      <div class="op-chat-title red">🔴 Red Operatives Chat</div>
+      <div class="op-chat-messages" id="red-chat-messages"></div>
+      <div class="op-chat-input-row">
+        <input type="text" id="red-chat-input" placeholder="Discuss your guess…" autocomplete="off" maxlength="120">
+        <button class="btn btn-secondary" onclick="sendChat('red')" style="font-size:0.78rem;padding:7px 12px">→</button>
+      </div>
+    </div>
+    <div class="op-chat-panel blue" id="blue-chat-panel" style="display:none">
+      <div class="op-chat-title blue">🔵 Blue Operatives Chat</div>
+      <div class="op-chat-messages" id="blue-chat-messages"></div>
+      <div class="op-chat-input-row">
+        <input type="text" id="blue-chat-input" placeholder="Discuss your guess…" autocomplete="off" maxlength="120">
+        <button class="btn btn-secondary" onclick="sendChat('blue')" style="font-size:0.78rem;padding:7px 12px">→</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- RESULT OVERLAY -->
@@ -967,6 +1031,13 @@ function subscribeRoom() {
     const me = data.players?.[myId];
     if (me) { myTeam = me.team; isSpymaster = me.isSpy || false; }
     updateStatusBar();
+    // Render team chats (operatives only)
+    if (data.chat) {
+      ['red','blue'].forEach(team => {
+        if (!isSpymaster && myTeam === team) renderChat(data.chat[team], team);
+      });
+    }
+    updateChatVisibility();
   });
 }
 
@@ -1144,7 +1215,14 @@ function renderGame(data) {
   tp.className = 'turn-pill ' + turn;
 
   // Spy settings (show only for active spy in clue phase)
-  document.getElementById('spy-settings').style.display = (isActiveSpy && phase === 'clue') ? '' : 'none';
+  const spySettingsEl = document.getElementById('spy-settings');
+  const shouldShowSpy = isActiveSpy && phase === 'clue';
+  // Only update display — never reset the timer input value once visible
+  if (shouldShowSpy && spySettingsEl.style.display === 'none') {
+    // First time showing — pre-fill with host's clue time as starting suggestion
+    document.getElementById('my-clue-time').value = data.clueTime || 90;
+  }
+  spySettingsEl.style.display = shouldShowSpy ? '' : 'none';
 
   // Clue panel
   const clueInputRow = document.getElementById('clue-input-row');
@@ -1193,6 +1271,8 @@ function renderGame(data) {
     `<div style="color:${p.team==='red'?'var(--red)':p.team==='blue'?'var(--blue)':'var(--muted)'};font-size:.78rem">
       ${p.isSpy?'🕵️ ':'👤 '}${p.name}${p.team?' ('+p.team+')':''}
     </div>`).join('');
+  // Update chat visibility based on current role
+  updateChatVisibility();
 
   // Timer
   startTimerDisplay(data, turn, phase);
@@ -1515,6 +1595,49 @@ window.confirmReset = async function() {
     showToast('Game reset — ready for a fresh start!');
   } catch(e) { showToast('Reset failed: ' + e.message); }
 };
+
+// ── OPERATIVES CHAT ──────────────────────────────────────────────────────
+window.sendChat = async function(team) {
+  if (isSpymaster) return; // spymasters cannot chat
+  if (myTeam !== team) return; // can only chat in own team
+  const inputEl = document.getElementById(team + '-chat-input');
+  const msg = inputEl.value.trim();
+  if (!msg) return;
+  inputEl.value = '';
+  const key = Date.now().toString() + '_' + Math.random().toString(36).slice(2,5);
+  await update(ref(db, `${roomPath}/chat/${team}/${key}`), { name: myName, msg, time: Date.now() });
+};
+
+// Enter key for chat
+document.addEventListener('DOMContentLoaded', () => {
+  ['red','blue'].forEach(team => {
+    const el = document.getElementById(team + '-chat-input');
+    if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') window.sendChat(team); });
+  });
+});
+
+function renderChat(chatData, team) {
+  const el = document.getElementById(team + '-chat-messages');
+  if (!el) return;
+  const msgs = chatData ? Object.values(chatData).sort((a,b)=>a.time-b.time) : [];
+  el.innerHTML = msgs.map(m =>
+    `<div class="op-chat-msg"><span class="msg-name ${team}">${m.name}:</span> ${m.msg}</div>`
+  ).join('') || `<div style="color:var(--muted);font-size:0.75rem">No messages yet…</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateChatVisibility() {
+  // Spymasters never see chat. Operatives only see their own team's chat.
+  const chatArea = document.getElementById('op-chat-area');
+  if (!chatArea) return;
+  if (isSpymaster) {
+    chatArea.style.display = 'none';
+    return;
+  }
+  chatArea.style.display = '';
+  document.getElementById('red-chat-panel').style.display = myTeam === 'red' ? '' : 'none';
+  document.getElementById('blue-chat-panel').style.display = myTeam === 'blue' ? '' : 'none';
+}
 
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
