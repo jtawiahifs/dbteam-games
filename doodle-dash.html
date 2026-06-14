@@ -559,7 +559,6 @@ function resizeCanvas() {
   const container = document.getElementById('canvas-container');
   const w = container.clientWidth;
   const h = Math.min(w * 0.65, 420);
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   canvas.width = w; canvas.height = h;
   ctx.fillStyle = '#fafafa'; ctx.fillRect(0,0,w,h);
   redrawStrokes();
@@ -567,36 +566,52 @@ function resizeCanvas() {
 
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
-  return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+  return {
+    x: Math.round((e.clientX - rect.left) * (canvas.width / rect.width)),
+    y: Math.round((e.clientY - rect.top) * (canvas.height / rect.height))
+  };
 }
 
 function startDraw(e) {
   if (!isDrawer) return;
   drawing = true;
   const pos = getPos(e);
-  currentStroke = { color: currentTool==='eraser' ? '#fafafa' : currentColor, size: currentTool==='eraser' ? brushSize*3 : brushSize, points: [pos] };
+  currentStroke = {
+    color: currentTool==='eraser' ? '#fafafa' : currentColor,
+    size: currentTool==='eraser' ? brushSize*3 : brushSize,
+    points: [pos]
+  };
   ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
 }
+
 function doDraw(e) {
   if (!drawing || !isDrawer) return;
   const pos = getPos(e);
   currentStroke.points.push(pos);
-  ctx.lineWidth = currentStroke.size; ctx.strokeStyle = currentStroke.color;
+  ctx.lineWidth = currentStroke.size;
+  ctx.strokeStyle = currentStroke.color;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   const pts = currentStroke.points;
   const l = pts.length;
-  if (l >= 2) { ctx.beginPath(); ctx.moveTo(pts[l-2].x, pts[l-2].y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+  if (l >= 2) {
+    ctx.beginPath();
+    ctx.moveTo(pts[l-2].x, pts[l-2].y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+  }
 }
+
 async function endDraw() {
   if (!drawing || !isDrawer || !currentStroke) return;
   drawing = false;
   strokes.push(currentStroke);
-  // Send stroke to Firebase (throttled — send last 5 strokes)
-  const strokesRef = ref(db, `${roomPath}/strokes`);
-  const key = Date.now().toString();
+  // Convert points to Firebase-safe flat string (no nested arrays)
+  const pointsStr = currentStroke.points.map(p => `${p.x},${p.y}`).join(';');
+  const key = Date.now().toString() + '_' + Math.random().toString(36).slice(2,5);
   await update(ref(db, `${roomPath}/strokes/${key}`), {
-    color: currentStroke.color, size: currentStroke.size,
-    points: currentStroke.points.map(p => [Math.round(p.x), Math.round(p.y)])
+    color: currentStroke.color,
+    size: currentStroke.size,
+    pts: pointsStr
   });
   currentStroke = null;
 }
@@ -608,10 +623,23 @@ function redrawStrokes() {
 }
 
 function drawStroke(s) {
-  if (!s.points || s.points.length < 2) return;
-  ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = s.size; ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.moveTo(s.points[0][0]||s.points[0].x, s.points[0][1]||s.points[0].y);
-  s.points.slice(1).forEach(p => ctx.lineTo(p[0]||p.x, p[1]||p.y));
+  if (!s) return;
+  // Parse points — support both new string format and legacy object format
+  let points;
+  if (s.pts && typeof s.pts === 'string') {
+    points = s.pts.split(';').map(p => { const [x,y] = p.split(','); return {x:+x, y:+y}; });
+  } else if (s.points) {
+    points = Array.isArray(s.points)
+      ? s.points.map(p => Array.isArray(p) ? {x:p[0],y:p[1]} : p)
+      : Object.values(s.points).map(p => Array.isArray(p) ? {x:p[0],y:p[1]} : p);
+  } else return;
+  if (points.length < 2) return;
+  ctx.beginPath();
+  ctx.strokeStyle = s.color || '#000';
+  ctx.lineWidth = s.size || 4;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
   ctx.stroke();
 }
 
@@ -619,7 +647,9 @@ window.clearCanvas = async function() {
   if (!isDrawer) return;
   strokes = [];
   ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  await remove(ref(db, `${roomPath}/strokes`));
+  // Remove all strokes from Firebase
+  const { remove: removeRef } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  await removeRef(ref(db, `${roomPath}/strokes`));
 };
 window.fillCanvas = function() {
   if (!isDrawer) return;
@@ -722,10 +752,8 @@ function subscribeRoom() {
     // Sync strokes for guessers
     if (data.state==='drawing' && !isDrawer) {
       const fireStrokes = data.strokes ? Object.values(data.strokes) : [];
-      if (fireStrokes.length !== strokes.length) {
-        strokes = fireStrokes;
-        redrawStrokes();
-      }
+      strokes = fireStrokes;
+      redrawStrokes();
     }
     updateStatusBar();
   });
@@ -872,87 +900,129 @@ window.startGame = async function() {
 };
 
 // ── RENDER DRAWING ROUND ─────────────────────────────────────────────────────
+let lastDrawingRound = -1; // track to avoid timer restart on every Firebase update
+
 function renderDrawing(data) {
   showScreen('game');
-  clearInterval(timerInterval);
-  wrongGuessCount = 0; hasGuessedCorrectly = false;
 
   const settings = data.settings || {};
   const drawOrder = data.drawOrder ? Object.values(data.drawOrder) : [];
+  // Fix: Firebase stores words with string keys — get by string index
   const words = data.words ? Object.values(data.words) : [];
   const currentRound = data.currentRound || 0;
   const currentDrawerIdx = data.currentDrawerIdx || 0;
-  const scores = data.scores || {};
   const redTeamScore = data.redTeamScore || 0;
   const blueTeamScore = data.blueTeamScore || 0;
   const totalRounds = settings.rounds || 8;
   const drawerIdInOrder = drawOrder[currentDrawerIdx % drawOrder.length];
   isDrawer = myId === drawerIdInOrder;
-  const word = words[currentRound] || words[0];
+  // Get word by matching idx field or by position
+  const word = words.find(w => w.idx === currentRound) || words[currentRound] || words[0];
+  if (!word) return;
 
-  // Update UI
+  // Update scores always
   document.getElementById('round-badge').textContent = `Round ${currentRound+1}/${totalRounds}`;
-  document.getElementById('red-score').textContent = redTeamScore || 0;
-  document.getElementById('blue-score').textContent = blueTeamScore || 0;
+  document.getElementById('red-score').textContent = redTeamScore;
+  document.getElementById('blue-score').textContent = blueTeamScore;
 
-  const diffTag = document.getElementById('diff-tag');
-  diffTag.textContent = word.d; diffTag.className = `difficulty-tag ${word.d}`;
+  // Always update guess feed (visible to ALL players including drawer)
+  renderGuessFeed(data.guesses || {});
 
-  if (isDrawer) {
-    document.getElementById('word-for-drawer').style.display = '';
-    document.getElementById('word-for-drawer').textContent = word.w;
-    document.getElementById('word-blanks').style.display = 'none';
-    document.getElementById('hint-btn').style.display = 'none';
-    document.getElementById('canvas-overlay').style.display = 'none';
-    document.getElementById('drawing-tools').style.display = '';
-    document.getElementById('guess-input-row').style.display = 'none';
-    document.getElementById('guess-panel').querySelector('.guess-feed').innerHTML = '<div class="guess-item system">You are drawing — watch the guesses!</div>';
-    strokes = []; redrawStrokes();
-  } else {
-    document.getElementById('word-for-drawer').style.display = 'none';
-    document.getElementById('word-blanks').textContent = word.w.split('').map(c=>c===' '?' ':'_').join(' ');
-    document.getElementById('word-blanks').style.display = '';
-    document.getElementById('hint-btn').style.display = '';
-    document.getElementById('hint-btn').disabled = false;
-    document.getElementById('canvas-overlay').style.display = hasGuessedCorrectly ? '' : 'none';
-    document.getElementById('canvas-overlay').innerHTML = hasGuessedCorrectly ? '✅ You guessed it! Watch others…' : '👀 Watch &amp; Guess!';
-    document.getElementById('drawing-tools').style.display = 'none';
-    document.getElementById('guess-input-row').style.display = '';
-    document.getElementById('guess-input').disabled = hasGuessedCorrectly;
-    document.getElementById('guess-input').value = '';
-  }
-
-  // Guess feed
-  renderGuessFeed(data.guesses || {}, data.players || {});
-
-  // Sync strokes
+  // Sync strokes for guessers always
   if (!isDrawer) {
-    strokes = data.strokes ? Object.values(data.strokes) : [];
+    const fireStrokes = data.strokes ? Object.values(data.strokes) : [];
+    strokes = fireStrokes;
     redrawStrokes();
   }
 
-  // Timer
-  const elapsed = Math.floor((Date.now() - (data.roundStartTime||Date.now())) / 1000);
-  let remaining = Math.max(0, settings.drawTime - elapsed);
-  const tp = document.getElementById('timer-pill');
-  function tick() {
-    tp.textContent = remaining;
-    tp.className = 'timer-pill' + (remaining<=10?' urgent':'');
-    if (remaining<=0) { clearInterval(timerInterval); if(isHost) endRound(); }
-    remaining--;
+  // Update blanks if hint was used
+  if (!isDrawer && data.hintBlanks && typeof data.hintBlanks === 'string') {
+    document.getElementById('word-blanks').textContent = data.hintBlanks;
   }
-  tick();
-  timerInterval = setInterval(tick, 1000);
+
+  // Check if this player already guessed correctly this round
+  const myGuess = data.guesses ? Object.values(data.guesses).find(g => g.playerId === myId && g.correct) : null;
+  if (myGuess && !hasGuessedCorrectly) {
+    hasGuessedCorrectly = true;
+    // Reveal word in blanks
+    document.getElementById('word-blanks').textContent = word.w;
+    document.getElementById('guess-input').disabled = true;
+    document.getElementById('canvas-overlay').style.display = '';
+    document.getElementById('canvas-overlay').innerHTML = '✅ You guessed it!';
+  }
+
+  // Only re-render full UI and restart timer when round changes
+  if (currentRound !== lastDrawingRound) {
+    lastDrawingRound = currentRound;
+    wrongGuessCount = 0;
+    hasGuessedCorrectly = false;
+    clearInterval(timerInterval);
+
+    const diffTag = document.getElementById('diff-tag');
+    diffTag.textContent = word.d; diffTag.className = `difficulty-tag ${word.d}`;
+
+    if (isDrawer) {
+      document.getElementById('word-for-drawer').style.display = '';
+      document.getElementById('word-for-drawer').textContent = word.w;
+      document.getElementById('word-blanks').style.display = 'none';
+      document.getElementById('hint-btn').style.display = 'none';
+      document.getElementById('canvas-overlay').style.display = 'none';
+      document.getElementById('drawing-tools').style.display = '';
+      document.getElementById('guess-input-row').style.display = 'none';
+      strokes = []; redrawStrokes();
+    } else {
+      document.getElementById('word-for-drawer').style.display = 'none';
+      document.getElementById('word-blanks').textContent = word.w.split('').map(()=>'_').join(' ');
+      document.getElementById('word-blanks').style.display = '';
+      document.getElementById('hint-btn').style.display = '';
+      document.getElementById('hint-btn').disabled = false;
+      document.getElementById('canvas-overlay').style.display = 'none';
+      document.getElementById('drawing-tools').style.display = 'none';
+      document.getElementById('guess-input-row').style.display = '';
+      document.getElementById('guess-input').disabled = false;
+      document.getElementById('guess-input').value = '';
+    }
+
+    // Start timer ONCE per round using server roundStartTime
+    const elapsed = Math.floor((Date.now() - (data.roundStartTime || Date.now())) / 1000);
+    let remaining = Math.max(0, (settings.drawTime || 90) - elapsed);
+    const tp = document.getElementById('timer-pill');
+    const runTick = () => {
+      tp.textContent = remaining;
+      tp.className = 'timer-pill' + (remaining <= 10 ? ' urgent' : '');
+      if (remaining <= 0) {
+        clearInterval(timerInterval);
+        // Reveal word to everyone and end round
+        if (!isDrawer) {
+          document.getElementById('word-blanks').textContent = word.w;
+          document.getElementById('guess-input').disabled = true;
+        }
+        document.getElementById('canvas-overlay').style.display = '';
+        document.getElementById('canvas-overlay').innerHTML = `⏰ Time up! The word was: <strong>${word.w}</strong>`;
+        if (isHost) endRound();
+        return;
+      }
+      remaining--;
+    };
+    runTick();
+    timerInterval = setInterval(runTick, 1000);
+  }
 
   updateStatusBar();
 }
 
-function renderGuessFeed(guesses, players) {
+function renderGuessFeed(guesses) {
   const feed = document.getElementById('guess-feed');
+  if (!feed) return;
   feed.innerHTML = '';
-  Object.values(guesses).sort((a,b)=>a.time-b.time).forEach(g => {
+  const entries = Object.values(guesses).sort((a,b)=>a.time-b.time);
+  if (entries.length === 0) {
+    feed.innerHTML = '<div class="guess-item system">No guesses yet…</div>';
+    return;
+  }
+  entries.forEach(g => {
     const div = document.createElement('div');
-    div.className = 'guess-item ' + (g.correct?'correct':'wrong');
+    div.className = 'guess-item ' + (g.correct ? 'correct' : 'wrong');
     div.innerHTML = `<span class="guesser-name">${g.name}:</span> ${g.correct ? '✅ Correct!' : g.text}`;
     feed.appendChild(div);
   });
@@ -992,80 +1062,93 @@ window.submitGuess = async function() {
   const guess = input.value.trim();
   if (!guess) return;
   input.value = '';
+
   const snap = await get(roomRef);
   const data = snap.val();
   if (data.state !== 'drawing') return;
-  const word = data.words[data.currentRound];
-  const correct = guess.toUpperCase() === word.w.toUpperCase();
+
+  // Fix: Firebase words keyed by string — find by idx field
+  const wordsObj = data.words || {};
+  const wordsArr = Object.values(wordsObj);
+  const currentRound = data.currentRound || 0;
+  const word = wordsArr.find(w => w.idx === currentRound) || wordsArr[currentRound];
+  if (!word) return;
+
+  // Prevent double submission
   const guesses = data.guesses || {};
-  const alreadyCorrect = Object.values(guesses).some(g=>g.playerId===myId&&g.correct);
+  const alreadyCorrect = Object.values(guesses).some(g => g.playerId === myId && g.correct);
   if (alreadyCorrect) return;
 
-  const elapsed = Math.floor((Date.now() - (data.roundStartTime||Date.now())) / 1000);
-  const timeBonus = Math.max(0, data.settings.drawTime - elapsed);
+  const correct = guess.trim().toUpperCase() === word.w.trim().toUpperCase();
+  const elapsed = Math.floor((Date.now() - (data.roundStartTime || Date.now())) / 1000);
+  const drawTime = data.settings?.drawTime || 90;
   let pts = 0;
+
   if (correct) {
-    // Speed-based: 500 base + up to 500 time bonus
-    const correctCount = Object.values(guesses).filter(g=>g.correct).length;
-    pts = Math.round(500 + (timeBonus / data.settings.drawTime) * 500) - (correctCount * 50);
+    const correctCount = Object.values(guesses).filter(g => g.correct).length;
+    const timeBonus = Math.max(0, drawTime - elapsed);
+    pts = Math.round(500 + (timeBonus / drawTime) * 500) - (correctCount * 50);
     pts = Math.max(100, pts);
     hasGuessedCorrectly = true;
+    // Immediately reveal word in blanks for this player
+    document.getElementById('word-blanks').textContent = word.w;
     document.getElementById('guess-input').disabled = true;
     document.getElementById('canvas-overlay').style.display = '';
-    document.getElementById('canvas-overlay').innerHTML = '✅ You guessed it!';
-    showFloatingPoint('+'+pts, '#06d6a0');
+    document.getElementById('canvas-overlay').innerHTML = `✅ Correct! +${pts} pts`;
+    showFloatingPoint('+' + pts, '#06d6a0');
   } else {
     wrongGuessCount++;
-    const penalty = data.settings.penalty || 0;
+    const penalty = data.settings?.penalty || 0;
     if (penalty > 0) {
       pts = -penalty;
-      showFloatingPoint('-'+penalty, '#e94560');
+      showFloatingPoint('-' + penalty, '#e94560');
     }
   }
 
-  const guessKey = Date.now().toString();
+  // Write guess — always show text to everyone, hide word for wrong guesses
+  const guessKey = Date.now().toString() + '_' + myId.slice(-4);
   await update(ref(db, `${roomPath}/guesses/${guessKey}`), {
-    playerId: myId, name: myName, text: guess, correct, pts, time: Date.now()
+    playerId: myId, name: myName,
+    text: correct ? '(correct)' : guess,  // don't spoil the word for wrong guesses
+    correct, pts, time: Date.now()
   });
 
-  // Update score
+  // Update this player's score
   if (pts !== 0) {
     const currentScore = data.scores?.[myId]?.score || 0;
-    const newScore = Math.max(0, currentScore + pts);
-    await update(ref(db, `${roomPath}/scores/${myId}/score`), newScore);
-    // Update team score
-    const teamKey = myTeam==='red' ? 'redTeamScore' : 'blueTeamScore';
-    const teamScore = Math.max(0, (data[teamKey]||0) + pts);
-    await update(ref(db, `${roomPath}/${teamKey}`), teamScore);
+    await update(ref(db, `${roomPath}/scores/${myId}/score`), Math.max(0, currentScore + pts));
+    const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+    await update(ref(db, `${roomPath}/${teamKey}`), Math.max(0, (data[teamKey] || 0) + pts));
   }
 
-  // Drawer also gets pts per correct guess
   if (correct) {
-    const drawerId = data.drawOrder[data.currentDrawerIdx % data.drawOrder.length];
-    if (drawerId !== myId) {
-      const drawerScore = (data.scores?.[drawerId]?.score||0) + 50;
-      await update(ref(db, `${roomPath}/scores/${drawerId}/score`), drawerScore);
+    // Drawer earns points per correct guess
+    const drawerKey = Object.values(data.drawOrder)[data.currentDrawerIdx % Object.values(data.drawOrder).length];
+    if (drawerKey && drawerKey !== myId) {
+      const drawerScore = (data.scores?.[drawerKey]?.score || 0) + 50;
+      await update(ref(db, `${roomPath}/scores/${drawerKey}/score`), drawerScore);
     }
-    // Streak check
-    const team = myTeam;
-    const streakKey = team==='red' ? 'redStreak' : 'blueStreak';
-    const newStreak = (data[streakKey]||0) + 1;
-    const streakAt = data.settings.streakAt;
+
+    // Streak bonus
+    const streakKey = myTeam === 'red' ? 'redStreak' : 'blueStreak';
+    const newStreak = (data[streakKey] || 0) + 1;
+    const streakAt = data.settings?.streakAt || 0;
     await update(ref(db, `${roomPath}/${streakKey}`), newStreak);
     if (streakAt > 0 && newStreak >= streakAt) {
       const bonusPts = streakAt >= 5 ? 300 : 150;
-      const teamKey = team==='red' ? 'redTeamScore' : 'blueTeamScore';
-      const newTeamScore = (data[teamKey]||0) + bonusPts;
-      await update(ref(db, `${roomPath}/${teamKey}`), newTeamScore);
+      const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+      await update(ref(db, `${roomPath}/${teamKey}`), (data[teamKey] || 0) + bonusPts);
       await update(ref(db, `${roomPath}/${streakKey}`), 0);
-      showToast(`🔥 ${team.toUpperCase()} TEAM STREAK +${bonusPts}pts!`);
+      showToast(`🔥 ${myTeam.toUpperCase()} STREAK +${bonusPts}pts!`);
     }
 
-    // Check if all non-drawers have guessed
+    // If every non-drawer has guessed correctly, end round early
     const players = data.players || {};
-    const nonDrawers = Object.keys(players).filter(id=>id!==data.drawOrder[data.currentDrawerIdx%data.drawOrder.length]);
-    const correctGuessers = Object.values({...guesses, [guessKey]:{correct,playerId:myId}}).filter(g=>g.correct).map(g=>g.playerId);
-    if (nonDrawers.every(id=>correctGuessers.includes(id))) {
+    const drawerIdNow = Object.values(data.drawOrder)[data.currentDrawerIdx % Object.values(data.drawOrder).length];
+    const nonDrawers = Object.keys(players).filter(id => id !== drawerIdNow);
+    const allGuesses = { ...guesses, [guessKey]: { correct: true, playerId: myId } };
+    const correctIds = Object.values(allGuesses).filter(g => g.correct).map(g => g.playerId);
+    if (nonDrawers.length > 0 && nonDrawers.every(id => correctIds.includes(id))) {
       clearInterval(timerInterval);
       if (isHost) endRound();
     }
@@ -1088,7 +1171,17 @@ function showFloatingPoint(text, color) {
 // ── END ROUND ────────────────────────────────────────────────────────────────
 async function endRound() {
   clearInterval(timerInterval);
-  await update(roomRef, { state:'rating', ratingStart: Date.now() });
+  const snap = await get(roomRef);
+  const data = snap.val();
+  const wordsArr = data.words ? Object.values(data.words) : [];
+  const currentRound = data.currentRound || 0;
+  const word = wordsArr.find(w => w.idx === currentRound) || wordsArr[currentRound];
+  // Store revealed word so all clients can display it
+  await update(roomRef, {
+    state: 'rating',
+    ratingStart: Date.now(),
+    revealedWord: word ? word.w : ''
+  });
 }
 
 // ── RATING ───────────────────────────────────────────────────────────────────
@@ -1159,7 +1252,7 @@ function showRoundResult(data) {
   showScreen('result');
   clearInterval(timerInterval);
   const word = data.words?.[data.currentRound];
-  document.getElementById('result-word').textContent = word?.w || '—';
+  document.getElementById('result-word').textContent = data.revealedWord || word?.w || '—';
   const drawerName = data.players?.[data.drawOrder?.[data.currentDrawerIdx%data.drawOrder.length]]?.name||'';
   document.getElementById('result-drawer').textContent = `Drawn by ${drawerName} · ⭐ Avg rating: ${data.avgRating||'N/A'}`;
   document.getElementById('host-next-ctrl').style.display = isHost ? '' : 'none';
