@@ -809,32 +809,41 @@ window.startGame = async function() {
   const isCustom = document.getElementById('wm-custom').classList.contains('active');
   const customWords = isCustom ? parseCustomWords() : [];
 
-  const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom:isCustom, customWords };
+  // Settings stored in Firebase must NOT contain arrays (Firebase can't store them reliably)
+  const settings = { rounds, drawTime, difficulty, penalty, streakAt, useCustom: isCustom };
 
-  // Build all players list rotating teams for drawing order
+  // Build draw order
   const allPlayers = Object.entries(players).sort((a,b)=>a[1].joinedAt-b[1].joinedAt);
   const drawOrder = allPlayers.map(([id])=>id);
 
-  // Pick words
-  const words = pickWords(settings, rounds * drawOrder.length + 5);
+  // Pick words locally (using customWords array) before writing to Firebase
+  const localSettings = { ...settings, customWords };
+  const words = pickWords(localSettings, rounds * drawOrder.length + 5);
 
-  const scores = {};
-  allPlayers.forEach(([id,p])=>{ scores[id] = { name:p.name, team:p.team, score:0, ratings:[], ratingsGiven:0 }; });
+  const scoresObj = {};
+  allPlayers.forEach(([id,p])=>{ scoresObj[id] = { name:p.name, team:p.team, score:0 }; });
 
-  // Convert words array to indexed object for Firebase compatibility
+  // Convert to Firebase-safe indexed objects (no raw arrays)
   const wordsObj = {};
-  words.forEach((e,i) => { wordsObj[i] = {...e, idx:i}; });
+  words.forEach((e,i) => { wordsObj[i] = { w: e.w, d: e.d, idx: i }; });
   const drawOrderObj = {};
   drawOrder.forEach((id,i) => { drawOrderObj[i] = id; });
-  const scoresObj = {};
-  Object.entries(scores).forEach(([id,s]) => { scoresObj[id] = s; });
 
   await update(roomRef, {
-    state:'drawing', settings, drawOrder:drawOrderObj, words:wordsObj,
-    currentRound:0, currentDrawerIdx:0,
-    scores:scoresObj, redTeamScore:0, blueTeamScore:0,
-    redStreak:0, blueStreak:0,
-    strokes:null, guesses:null, hintsUsed:0,
+    state: 'drawing',
+    settings,
+    drawOrder: drawOrderObj,
+    words: wordsObj,
+    currentRound: 0,
+    currentDrawerIdx: 0,
+    scores: scoresObj,
+    redTeamScore: 0,
+    blueTeamScore: 0,
+    redStreak: 0,
+    blueStreak: 0,
+    strokes: null,
+    guesses: null,
+    hintsUsed: 0,
     roundStartTime: Date.now(),
   });
 };
