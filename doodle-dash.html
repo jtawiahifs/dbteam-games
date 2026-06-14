@@ -1192,60 +1192,84 @@ window.submitGuess = async function() {
     }
   }
 
-  // Write guess — always show text to everyone, hide word for wrong guesses
+  // Write guess
   const guessKey = Date.now().toString() + '_' + myId.slice(-4);
   await update(ref(db, `${roomPath}/guesses/${guessKey}`), {
     playerId: myId, name: myName,
-    text: correct ? '(correct)' : guess,  // don't spoil the word for wrong guesses
+    text: correct ? '(correct)' : guess,
     correct, pts, time: Date.now()
   });
 
-  // Update this player's score — always re-fetch to avoid stale data
+  // Update scores using fresh reads to avoid stale data
   if (pts !== 0) {
-    const freshSnap = await get(ref(db, `${roomPath}/scores/${myId}/score`));
-    const currentScore = freshSnap.val() || 0;
+    // Player score
+    const freshPlayerSnap = await get(ref(db, `${roomPath}/scores/${myId}/score`));
+    const currentScore = Number(freshPlayerSnap.val()) || 0;
     const newScore = Math.max(0, currentScore + pts);
     await update(ref(db, `${roomPath}/scores/${myId}`), { score: newScore });
-    // Use player's stored team (myTeam set from Firebase) for team score
-    const playerTeam = myTeam || data.scores?.[myId]?.team || '';
+
+    // Team score — get player's team from scores entry (most reliable)
+    const playerScoreSnap = await get(ref(db, `${roomPath}/scores/${myId}/team`));
+    const playerTeam = String(playerScoreSnap.val() || myTeam || '');
     if (playerTeam === 'red' || playerTeam === 'blue') {
       const teamKey = playerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
       const freshTeamSnap = await get(ref(db, `${roomPath}/${teamKey}`));
-      const currentTeamScore = freshTeamSnap.val() || 0;
-      await update(ref(db, `${roomPath}`), { [teamKey]: Math.max(0, currentTeamScore + pts) });
+      const currentTeamScore = Number(freshTeamSnap.val()) || 0;
+      const newTeamScore = Math.max(0, currentTeamScore + pts);
+      await update(ref(db, `${roomPath}`), { [teamKey]: newTeamScore });
     }
   }
 
   if (correct) {
-    // Drawer earns points per correct guess
+    // Drawer earns +50 pts per correct guesser — fresh read
     const drawerKey = Object.values(data.drawOrder)[data.currentDrawerIdx % Object.values(data.drawOrder).length];
     if (drawerKey && drawerKey !== myId) {
-      const drawerScore = (data.scores?.[drawerKey]?.score || 0) + 50;
-      await update(ref(db, `${roomPath}/scores/${drawerKey}/score`), drawerScore);
+      const freshDrawerSnap = await get(ref(db, `${roomPath}/scores/${drawerKey}/score`));
+      const drawerCurrentScore = Number(freshDrawerSnap.val()) || 0;
+      await update(ref(db, `${roomPath}/scores/${drawerKey}`), { score: drawerCurrentScore + 50 });
+      // Also add to drawer's team score
+      const drawerTeamSnap = await get(ref(db, `${roomPath}/scores/${drawerKey}/team`));
+      const drawerTeam = String(drawerTeamSnap.val() || '');
+      if (drawerTeam === 'red' || drawerTeam === 'blue') {
+        const dtKey = drawerTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+        const freshDtSnap = await get(ref(db, `${roomPath}/${dtKey}`));
+        await update(ref(db, `${roomPath}`), { [dtKey]: (Number(freshDtSnap.val()) || 0) + 50 });
+      }
     }
 
     // Streak bonus
-    const streakKey = myTeam === 'red' ? 'redStreak' : 'blueStreak';
-    const newStreak = (data[streakKey] || 0) + 1;
-    const streakAt = data.settings?.streakAt || 0;
-    await update(ref(db, `${roomPath}/${streakKey}`), newStreak);
-    if (streakAt > 0 && newStreak >= streakAt) {
-      const bonusPts = streakAt >= 5 ? 300 : 150;
-      const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
-      await update(ref(db, `${roomPath}/${teamKey}`), (data[teamKey] || 0) + bonusPts);
-      await update(ref(db, `${roomPath}/${streakKey}`), 0);
-      showToast(`🔥 ${myTeam.toUpperCase()} STREAK +${bonusPts}pts!`);
+    if (myTeam === 'red' || myTeam === 'blue') {
+      const streakKey = myTeam === 'red' ? 'redStreak' : 'blueStreak';
+      const freshStreakSnap = await get(ref(db, `${roomPath}/${streakKey}`));
+      const newStreak = (Number(freshStreakSnap.val()) || 0) + 1;
+      const streakAt = data.settings?.streakAt || 0;
+      await update(ref(db, `${roomPath}`), { [streakKey]: newStreak });
+      if (streakAt > 0 && newStreak >= streakAt) {
+        const bonusPts = streakAt >= 5 ? 300 : 150;
+        const teamKey = myTeam === 'red' ? 'redTeamScore' : 'blueTeamScore';
+        const freshBonusSnap = await get(ref(db, `${roomPath}/${teamKey}`));
+        await update(ref(db, `${roomPath}`), {
+          [teamKey]: (Number(freshBonusSnap.val()) || 0) + bonusPts,
+          [streakKey]: 0
+        });
+        showToast(`🔥 ${myTeam.toUpperCase()} STREAK +${bonusPts}pts!`);
+      }
     }
 
-    // If every non-drawer has guessed correctly, end round early
-    const players = data.players || {};
-    const drawerIdNow = Object.values(data.drawOrder)[data.currentDrawerIdx % Object.values(data.drawOrder).length];
-    const nonDrawers = Object.keys(players).filter(id => id !== drawerIdNow);
-    const allGuesses = { ...guesses, [guessKey]: { correct: true, playerId: myId } };
-    const correctIds = Object.values(allGuesses).filter(g => g.correct).map(g => g.playerId);
-    if (nonDrawers.length > 0 && nonDrawers.every(id => correctIds.includes(id))) {
+    // Check if ALL scored players (non-drawers) have guessed correctly
+    // Use scores keys (team players only) not players keys (includes teamless host)
+    const freshSnap2 = await get(roomRef);
+    const freshData = freshSnap2.val();
+    const drawerIdNow = Object.values(freshData.drawOrder || {})[freshData.currentDrawerIdx % Object.values(freshData.drawOrder || {}).length];
+    const scoredPlayers = Object.keys(freshData.scores || {});
+    const nonDrawerScored = scoredPlayers.filter(id => id !== drawerIdNow);
+    const freshGuesses = freshData.guesses || {};
+    const correctIds = Object.values(freshGuesses).filter(g => g.correct).map(g => g.playerId);
+    const allGuessed = nonDrawerScored.length > 0 && nonDrawerScored.every(id => correctIds.includes(id));
+    if (allGuessed) {
       clearInterval(timerInterval);
-      if (isHost) endRound(); // host triggers round end when all guessed
+      showToast('🎉 Everyone guessed it!');
+      await endRound();
     }
   }
 };
@@ -1265,6 +1289,9 @@ function showFloatingPoint(text, color) {
 
 // ── END ROUND ────────────────────────────────────────────────────────────────
 async function endRound() {
+  // Guard: only proceed if still in drawing state (prevent double-call)
+  const checkSnap = await get(ref(db, `${roomPath}/state`));
+  if (checkSnap.val() !== 'drawing') return;
   clearInterval(timerInterval);
   const snap = await get(roomRef);
   const data = snap.val();
