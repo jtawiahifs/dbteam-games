@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -527,24 +528,69 @@ let redStreak=0, blueStreak=0;
 
 // ── WORD BANK ────────────────────────────────────────────────────────────────
 const WORD_BANK = [
-  // Easy
+  // Easy (75 words) - Animals, Objects, Food, Nature, Basics
   {w:'DOG',d:'easy'},{w:'CAT',d:'easy'},{w:'SUN',d:'easy'},{w:'CAR',d:'easy'},
   {w:'TREE',d:'easy'},{w:'FISH',d:'easy'},{w:'BIRD',d:'easy'},{w:'HOUSE',d:'easy'},
   {w:'STAR',d:'easy'},{w:'MOON',d:'easy'},{w:'CAKE',d:'easy'},{w:'BOOK',d:'easy'},
   {w:'BALL',d:'easy'},{w:'RAIN',d:'easy'},{w:'BOAT',d:'easy'},{w:'FROG',d:'easy'},
   {w:'APPLE',d:'easy'},{w:'PIZZA',d:'easy'},{w:'CLOCK',d:'easy'},{w:'SMILE',d:'easy'},
-  // Medium
+  {w:'BEAR',d:'easy'},{w:'LION',d:'easy'},{w:'ELEPHANT',d:'easy'},{w:'ZEBRA',d:'easy'},
+  {w:'GIRAFFE',d:'easy'},{w:'MONKEY',d:'easy'},{w:'PIG',d:'easy'},{w:'COW',d:'easy'},
+  {w:'SHEEP',d:'easy'},{w:'RABBIT',d:'easy'},{w:'TURTLE',d:'easy'},{w:'SNAKE',d:'easy'},
+  {w:'SQUIRREL',d:'easy'},{w:'DEER',d:'easy'},{w:'MOUSE',d:'easy'},{w:'BEE',d:'easy'},
+  {w:'ANT',d:'easy'},{w:'BUTTERFLY',d:'easy'},{w:'LADYBUG',d:'easy'},{w:'WHALE',d:'easy'},
+  {w:'SHARK',d:'easy'},{w:'DOLPHIN',d:'easy'},{w:'OCTOPUS',d:'easy'},{w:'CRAB',d:'easy'},
+  {w:'JELLYFISH',d:'easy'},{w:'STARFISH',d:'easy'},{w:'PENGUIN',d:'easy'},{w:'OWL',d:'easy'},
+  {w:'EAGLE',d:'easy'},{w:'PARROT',d:'easy'},{w:'FLAMINGO',d:'easy'},{w:'PANDA',d:'easy'},
+  {w:'CUP',d:'easy'},{w:'CHAIR',d:'easy'},{w:'TABLE',d:'easy'},{w:'DOOR',d:'easy'},
+  {w:'WINDOW',d:'easy'},{w:'BED',d:'easy'},{w:'LAMP',d:'easy'},{w:'PILLOW',d:'easy'},
+  {w:'BLANKET',d:'easy'},{w:'PLATE',d:'easy'},{w:'FORK',d:'easy'},{w:'SPOON',d:'easy'},
+  {w:'KNIFE',d:'easy'},{w:'GLASS',d:'easy'},{w:'BOTTLE',d:'easy'},{w:'BUCKET',d:'easy'},
+  {w:'ROPE',d:'easy'},{w:'PENCIL',d:'easy'},{w:'PEN',d:'easy'},{w:'ERASER',d:'easy'},
+  {w:'RULER',d:'easy'},{w:'SCISSORS',d:'easy'},{w:'BANANA',d:'easy'},{w:'ORANGE',d:'easy'},
+  {w:'CHERRY',d:'easy'},{w:'GRAPE',d:'easy'},{w:'WATERMELON',d:'easy'},{w:'CARROT',d:'easy'},
+  {w:'POTATO',d:'easy'},{w:'CORN',d:'easy'},{w:'BROCCOLI',d:'easy'},{w:'SANDWICH',d:'easy'},
+  {w:'HAMBURGER',d:'easy'},{w:'DONUT',d:'easy'},{w:'COOKIE',d:'easy'},{w:'ICE CREAM',d:'easy'},
+  {w:'CHOCOLATE',d:'easy'},{w:'CLOUD',d:'easy'},{w:'WIND',d:'easy'},{w:'SNOW',d:'easy'},
+  {w:'LIGHTNING',d:'easy'},{w:'RAINBOW',d:'easy'},{w:'FLOWER',d:'easy'},{w:'GRASS',d:'easy'},
+  // Medium (75 words) - Activities, Landmarks, Emotions, Sports, Tech, Nature
   {w:'LAPTOP',d:'medium'},{w:'BRIDGE',d:'medium'},{w:'ROCKET',d:'medium'},{w:'CASTLE',d:'medium'},
-  {w:'GUITAR',d:'medium'},{w:'PENGUIN',d:'medium'},{w:'VOLCANO',d:'medium'},{w:'PYRAMID',d:'medium'},
-  {w:'COMPASS',d:'medium'},{w:'LANTERN',d:'medium'},{w:'RAINBOW',d:'medium'},{w:'TORNADO',d:'medium'},
-  {w:'CACTUS',d:'medium'},{w:'ANCHOR',d:'medium'},{w:'MAGNET',d:'medium'},{w:'TROPHY',d:'medium'},
-  {w:'CANDLE',d:'medium'},{w:'SPIDER',d:'medium'},{w:'DIAMOND',d:'medium'},{w:'FEATHER',d:'medium'},
-  // Hard
+  {w:'GUITAR',d:'medium'},{w:'VOLCANO',d:'medium'},{w:'PYRAMID',d:'medium'},{w:'COMPASS',d:'medium'},
+  {w:'LANTERN',d:'medium'},{w:'TORNADO',d:'medium'},{w:'CACTUS',d:'medium'},{w:'ANCHOR',d:'medium'},
+  {w:'MAGNET',d:'medium'},{w:'TROPHY',d:'medium'},{w:'CANDLE',d:'medium'},{w:'SPIDER',d:'medium'},
+  {w:'DIAMOND',d:'medium'},{w:'FEATHER',d:'medium'},{w:'DANCING',d:'medium'},{w:'SWIMMING',d:'medium'},
+  {w:'RUNNING',d:'medium'},{w:'JUMPING',d:'medium'},{w:'SINGING',d:'medium'},{w:'PAINTING',d:'medium'},
+  {w:'COOKING',d:'medium'},{w:'READING',d:'medium'},{w:'WRITING',d:'medium'},{w:'SLEEPING',d:'medium'},
+  {w:'SITTING',d:'medium'},{w:'STANDING',d:'medium'},{w:'WALKING',d:'medium'},{w:'CLIMBING',d:'medium'},
+  {w:'FLYING',d:'medium'},{w:'TELESCOPE',d:'medium'},{w:'MICROSCOPE',d:'medium'},{w:'CAMERA',d:'medium'},
+  {w:'LIGHTHOUSE',d:'medium'},{w:'WINDMILL',d:'medium'},{w:'FERRIS WHEEL',d:'medium'},{w:'CAROUSEL',d:'medium'},
+  {w:'HAPPY',d:'medium'},{w:'SAD',d:'medium'},{w:'ANGRY',d:'medium'},{w:'SURPRISED',d:'medium'},
+  {w:'SCARED',d:'medium'},{w:'TIRED',d:'medium'},{w:'EXCITED',d:'medium'},{w:'CONFUSED',d:'medium'},
+  {w:'PROUD',d:'medium'},{w:'CALM',d:'medium'},{w:'BASKETBALL',d:'medium'},{w:'SOCCER',d:'medium'},
+  {w:'TENNIS',d:'medium'},{w:'BASEBALL',d:'medium'},{w:'FOOTBALL',d:'medium'},{w:'VOLLEYBALL',d:'medium'},
+  {w:'HOCKEY',d:'medium'},{w:'CRICKET',d:'medium'},{w:'GOLF',d:'medium'},{w:'BOWLING',d:'medium'},
+  {w:'SKATING',d:'medium'},{w:'SKIING',d:'medium'},{w:'SURFING',d:'medium'},{w:'GYMNASTICS',d:'medium'},
+  {w:'TABLET',d:'medium'},{w:'PHONE',d:'medium'},{w:'HEADPHONES',d:'medium'},{w:'KEYBOARD',d:'medium'},
+  {w:'MOUSE',d:'medium'},{w:'MONITOR',d:'medium'},{w:'PRINTER',d:'medium'},{w:'DRONE',d:'medium'},
+  {w:'SPACESHIP',d:'medium'},{w:'SATELLITE',d:'medium'},{w:'ROBOT',d:'medium'},{w:'JUNGLE',d:'medium'},
+  {w:'DESERT',d:'medium'},{w:'CANYON',d:'medium'},{w:'GLACIER',d:'medium'},{w:'CAVE',d:'medium'},
+  {w:'WATERFALL',d:'medium'},{w:'GEYSER',d:'medium'},{w:'METEOR',d:'medium'},{w:'COMET',d:'medium'},
+  {w:'DRAGON',d:'medium'},{w:'UNICORN',d:'medium'},{w:'PHOENIX',d:'medium'},{w:'FAIRY',d:'medium'},
+  {w:'GHOST',d:'medium'},{w:'SKELETON',d:'medium'},{w:'MUMMY',d:'medium'},{w:'VAMPIRE',d:'medium'},
+  // Hard (50 words) - Tech/Database, Advanced Concepts, Science, Complex Ideas
   {w:'DATABASE',d:'hard'},{w:'REPLICATION',d:'hard'},{w:'ALGORITHM',d:'hard'},{w:'FIREWALL',d:'hard'},
   {w:'ENCRYPTION',d:'hard'},{w:'BANDWIDTH',d:'hard'},{w:'MIGRATION',d:'hard'},{w:'LATENCY',d:'hard'},
   {w:'GOLDENGATE',d:'hard'},{w:'EXADATA',d:'hard'},{w:'FAILOVER',d:'hard'},{w:'CHECKPOINT',d:'hard'},
   {w:'PIPELINE',d:'hard'},{w:'KUBERNETES',d:'hard'},{w:'SERVERLESS',d:'hard'},{w:'MICROSERVICE',d:'hard'},
   {w:'INDEXING',d:'hard'},{w:'PARTITIONING',d:'hard'},{w:'THROUGHPUT',d:'hard'},{w:'ORCHESTRATION',d:'hard'},
+  {w:'CRYPTOCURRENCY',d:'hard'},{w:'BLOCKCHAIN',d:'hard'},{w:'QUANTUM COMPUTING',d:'hard'},{w:'ARTIFICIAL INTELLIGENCE',d:'hard'},
+  {w:'MACHINE LEARNING',d:'hard'},{w:'NEURAL NETWORK',d:'hard'},{w:'DEEP LEARNING',d:'hard'},{w:'CLOUD COMPUTING',d:'hard'},
+  {w:'VIRTUALIZATION',d:'hard'},{w:'CONTAINERIZATION',d:'hard'},{w:'PHOTOSYNTHESIS',d:'hard'},{w:'MITOCHONDRIA',d:'hard'},
+  {w:'GRAVITY',d:'hard'},{w:'EQUILIBRIUM',d:'hard'},{w:'CATALYST',d:'hard'},{w:'POLYMER',d:'hard'},
+  {w:'NUCLEUS',d:'hard'},{w:'ENZYME',d:'hard'},{w:'MOLECULE',d:'hard'},{w:'ATOM',d:'hard'},
+  {w:'QUARK',d:'hard'},{w:'CONSTELLATION',d:'hard'},{w:'SUPERNOVA',d:'hard'},{w:'AURORA',d:'hard'},
+  {w:'ECLIPSE',d:'hard'},{w:'DEMOCRACY',d:'hard'},{w:'SOCIALISM',d:'hard'},{w:'CAPITALISM',d:'hard'},
+  {w:'GOVERNANCE',d:'hard'},{w:'BUREAUCRACY',d:'hard'},{w:'DIPLOMACY',d:'hard'},{w:'LEGISLATION',d:'hard'},
 ];
 
 const COLORS = ['#1a1a2e','#e94560','#0f9cf5','#ffd700','#06d6a0','#ff6b35',
@@ -663,11 +709,13 @@ function drawStroke(s) {
 window.clearCanvas = async function() {
   if (!isDrawer) return;
   strokes = [];
+  ctx = canvas.getContext('2d');
   ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,canvas.width,canvas.height);
   await remove(ref(db, `${roomPath}/strokes`));
 };
 window.fillCanvas = function() {
   if (!isDrawer) return;
+  ctx = canvas.getContext('2d');
   ctx.fillStyle = currentColor; ctx.fillRect(0,0,canvas.width,canvas.height);
 };
 
@@ -884,7 +932,7 @@ function parseCustomWords() {
   }).filter(e=>e.w.length>0 && /^[A-Z\s]+$/.test(e.w));
 }
 
-function pickWords(settings, count) {
+async function pickWords(settings, count, usedWords={}) {
   let pool;
   if (settings.useCustom && settings.customWords?.length) {
     pool = settings.customWords;
@@ -893,7 +941,19 @@ function pickWords(settings, count) {
   }
   if (settings.difficulty !== 'all') pool = pool.filter(e=>e.d===settings.difficulty);
   if (!pool.length) pool = WORD_BANK;
-  const shuffled = [...pool].sort(()=>Math.random()-.5);
+
+  // Filter out words used in last 60 minutes
+  const now = Date.now();
+  const sixtyMinMs = 60 * 60 * 1000;
+  const available = pool.filter(word => {
+    const lastUsed = usedWords[word.w];
+    if (!lastUsed) return true; // Never used
+    return (now - lastUsed) > sixtyMinMs; // Used > 60 min ago
+  });
+
+  // Fallback to full pool if too many words filtered out
+  const finalPool = available.length >= Math.ceil(count * 0.5) ? available : pool;
+  const shuffled = [...finalPool].sort(()=>Math.random()-.5);
   return shuffled.slice(0, count);
 }
 
@@ -943,15 +1003,25 @@ window.startGame = async function() {
     // Build draw order from team players only
     const drawOrder = teamPlayers.map(([id])=>id);
 
-    // Pick words locally, convert to Firebase-safe object
+    // Fetch word usage tracking data
+    const wordUsageSnap = await get(ref(db, `${roomPath}/wordUsage`));
+    const usedWords = wordUsageSnap.val() || {};
+
+    // Pick words locally, filtering out words used in last 60 minutes, convert to Firebase-safe object
     const localSettings = { ...settings, customWords };
-    const wordsList = pickWords(localSettings, rounds * drawOrder.length + 5);
+    const wordsList = await pickWords(localSettings, rounds * drawOrder.length + 5, usedWords);
     if (!wordsList.length) {
       showToast('No words available — check difficulty settings');
       startBtn.disabled = false;
       startBtn.textContent = '🎨 Start Drawing!';
       return;
     }
+
+    // Update word usage timestamps for newly selected words
+    const wordUsageUpdates = {};
+    wordsList.forEach(w => {
+      wordUsageUpdates[`wordUsage/${w.w}`] = Date.now();
+    });
 
     // Build Firebase-safe objects (NO null values, NO arrays)
     const wordsObj = {};
@@ -980,6 +1050,7 @@ window.startGame = async function() {
       blueStreak: 0,
       hintsUsed: 0,
       roundStartTime: Date.now(),
+      ...wordUsageUpdates,
     });
 
   } catch(e) {
