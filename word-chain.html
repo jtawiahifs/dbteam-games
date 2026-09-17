@@ -769,8 +769,9 @@ import { getDatabase, ref, update, get, onValue } from "https://www.gstatic.com/
 
 let db, roomRef, myId, myName, isHost = false;
 let timerInterval, gameSettings = { rounds: 8, secs: 30 };
-let hasAnswered = false, roundStartTime = 0;
+let hasAnswered = false, roundStartTime = 0, roundEndTime = 0;
 let currentScreen = 'setup';
+let apiAbortController = null;
 
 // Curated word list (length 3-9)
 const WORDS = [
@@ -789,6 +790,8 @@ const WORDS = [
   'crisp','plank','frost','brave','blend','grasp','swift','prism','glint','brisk',
   'dwarf','flask','scout','trout','bland','clamp','grove','stunt','crave','drift',
 ];
+
+const GAME_WORD_LIST = new Set(['ABILITY', 'ABLE', 'ABOUT', 'ABOVE', 'ABSENCE', 'ABSENT', 'ABSOLUTE', 'ABSORB', 'ABSTRACT', 'ABUSE', 'ACCESS', 'ACCIDENT', 'ACCOUNT', 'ACCUSE', 'ACHIEVE', 'ACID', 'ACKNOWLEDGE', 'ACQUIRE', 'ACRE', 'ACROSS', 'ACT', 'ACTION', 'ACTIVE', 'ACTIVITY', 'ACTUAL', 'ADD', 'ADDICT', 'ADDITION', 'ADDRESS', 'ADEQUATE', 'ADJACENT', 'ADJUST', 'ADMIN', 'ADMIRE', 'ADMIT', 'ADOPT', 'ADULT', 'ADVANCE', 'ADVANTAGE', 'ADVENTURE', 'ADVERTISE', 'ADVICE', 'ADVISE', 'AFFAIR', 'AFFORD', 'AFRAID', 'AFTER', 'AGAIN', 'AGAINST', 'AGE', 'AGENT', 'AGO', 'AGREE', 'AGREEMENT', 'AHEAD', 'AID', 'AIM', 'AIR', 'ALARM', 'ALBUM', 'ALCOHOL', 'ALERT', 'ALIEN', 'ALIGN', 'ALIVE', 'ALL', 'ALLOW', 'ALMOST', 'ALONE', 'ALONG', 'ALOUD', 'ALPHABET', 'ALREADY', 'ALSO', 'ALTAR', 'ALTER', 'ALWAYS', 'AMATEUR', 'AMAZE', 'AMAZING', 'AMBITION', 'AMONG', 'AMOUNT', 'AMPLE', 'AMUSE', 'ANALYST', 'ANALYZE', 'ANCESTOR', 'ANCIENT', 'AND', 'ANDROID', 'ANGEL', 'ANGER', 'ANGLE', 'ANGRY', 'ANIMAL', 'ANIMATE', 'ANKLE', 'ANNOUNCE', 'ANNOY', 'ANNUAL', 'ANOTHER', 'ANSWER', 'ANT', 'ANTICIPATE', 'ANXIETY', 'ANXIOUS', 'ANY', 'ANYBODY', 'ANYONE', 'ANYTHING', 'ANYWAY', 'ANYWHERE', 'APART', 'APARTMENT', 'APOLOGY', 'APPEAR', 'APPLE', 'APPLICATION', 'APPLY', 'APPOINT', 'APPRECIATE', 'APPROACH', 'APPROPRIATE', 'APPROVAL', 'APPROVE', 'APRIL', 'APRON', 'ARCH', 'AREA', 'ARGUE', 'ARGUMENT', 'ARISE', 'ARM', 'ARMED', 'ARMOR', 'ARMY', 'AROUND', 'ARRANGE', 'ARREST', 'ARRIVAL', 'ARRIVE', 'ARROW', 'ART', 'ARTICLE', 'ARTIST', 'ARTWORK', 'ASH', 'ASHAMED', 'ASIDE', 'ASK', 'ASLEEP', 'ASPECT', 'ASSAULT', 'ASSEMBLE', 'ASSEMBLY', 'ASSENT', 'ASSERT', 'ASSESS', 'ASSET', 'ASSIGN', 'ASSIGNMENT', 'ASSIST', 'ASSISTANCE', 'ASSISTANT', 'ASSOCIATE', 'ASSOCIATION', 'ASSUME', 'ASSUMPTION', 'ASSURE', 'ASTONISH', 'ASTOUND', 'ASTRAY', 'ASTRONAUT', 'ASTRONOMY', 'ASYLUM', 'AT', 'ATE', 'ATHEISM', 'ATHEIST', 'ATHLETE', 'ATHLETIC', 'ATLAS', 'ATMOSPHERE', 'ATOM', 'ATOMIC', 'ATONE', 'ATONEMENT', 'ATROCIOUS', 'ATROCITY', 'ATTACH', 'ATTACHMENT', 'ATTACK', 'ATTACKER', 'ATTAIN', 'ATTAINMENT', 'ATTEMPT', 'ATTEND', 'ATTENDANCE', 'ATTENDANT', 'ATTENTION', 'ATTENTIVE', 'ATTEST', 'ATTIC', 'ATTIRE', 'ATTITUDE', 'ATTORNEY', 'ATTRACT', 'ATTRACTIVE', 'ATTRACTION', 'ATTRIBUTE', 'AUCTION', 'AUDIENCE', 'AUDIT', 'AUDITION', 'AUGUST', 'AUNT', 'AUSPICES', 'AUSPICIOUS', 'AUSTERE', 'AUSTRALIA', 'AUSTRALIAN', 'AUSTRIA', 'AUSTRIAN', 'AUTHENTIC', 'AUTHOR', 'AUTHORITATIVE', 'AUTHORITY', 'AUTHORIZATION', 'AUTHORIZE', 'AUTO', 'AUTOBIOGRAPHY', 'AUTOCRAT', 'AUTOCRATIC', 'AUTOGRAPH', 'AUTOMATIC', 'AUTOMOBILE', 'AUTONOMOUS', 'AUTONOMY', 'AUTOPSY', 'AUTUMN', 'AUXILIARY', 'AVAIL', 'AVAILABILITY', 'AVAILABLE', 'AVALANCHE', 'AVARICE', 'AVARICIOUS', 'AVENGE', 'AVENUE', 'AVERAGE', 'AVERSE', 'AVERSION', 'AVERT', 'AVIATION', 'AVIATOR', 'AVID', 'AVIDITY', 'AVOCADO', 'AVOID', 'AVOIDANCE', 'AVOW', 'AVOWAL', 'AWAIT', 'AWAKE', 'AWAKEN', 'AWAKENING', 'AWARD', 'AWARE', 'AWARENESS', 'AWAY', 'AWE', 'AWED', 'AWESOME', 'AWFUL', 'AWFULLY', 'AWHILE', 'AWKWARD', 'AWKWARDNESS', 'AWNING', 'AWOKE', 'AWRY', 'AXE', 'AXIOM', 'AXIS', 'AXLE', 'AXON', 'AYE', 'AZURE', 'BABY', 'BABYSIT', 'BABYSITTER', 'BACHELOR', 'BACK', 'BACKBONE', 'BACKDROP', 'BACKER', 'BACKGROUND', 'BACKING', 'BACKLASH', 'BACKLOG', 'BACKPACK', 'BACKSEAT', 'BACKSTAB', 'BACKSTAGE', 'BACKSTROKE', 'BACKUP', 'BACKWARD', 'BACKWARDS', 'BACON', 'BACTERIA', 'BACTERIAL', 'BAD', 'BADGE', 'BADGER', 'BADLY', 'BADNESS', 'BAFFLE', 'BAG', 'BAGGAGE', 'BAGGY', 'BAGPIPE', 'BAIL', 'BAILIFF', 'BAIT', 'BAKE', 'BAKER', 'BAKERY', 'BAKING', 'BALANCE', 'BALCONY', 'BALD', 'BALDNESS', 'BALE', 'BALEFUL', 'BALK', 'BALL', 'BALLAD', 'BALLAST', 'BALLERINA', 'BALLET', 'BALLISTIC', 'BALLOON', 'BALLOT', 'BALLROOM', 'BALM', 'BALMY', 'BALSA', 'BALTIC', 'BALUSTER', 'BAMBOO', 'BAN', 'BANAL', 'BANANA', 'BAND', 'BANDAGE', 'BANDIT', 'BANDSTAND', 'BANDY', 'BANE', 'BANEFUL', 'BANG', 'BANGLE', 'BANISH', 'BANISTER', 'BANJO', 'BANK', 'BANKER', 'BANKING', 'BANKRUPT', 'BANKRUPTCY', 'BANNER', 'BANQUET', 'BANTER', 'BAPTISM', 'BAPTIST', 'BAPTIZE', 'BAR', 'BARB', 'BARBARIAN', 'BARBARIC', 'BARBARISM', 'BARBARITY', 'BARBAROUS', 'BARBECUE', 'BARBED', 'BARBER', 'BARBERSHOP', 'BARBICAN', 'BARBITURATE', 'BARD', 'BARE', 'BAREBACK', 'BARELY', 'BARENESS', 'BARGAIN', 'BARGE', 'BARITONE', 'BARIUM', 'BARK', 'BARKEEPER', 'BARLEY', 'BARN', 'BARNACLE', 'BARNYARD', 'BAROMETER', 'BARON', 'BARONESS', 'BARONET', 'BARONIAL', 'BAROQUE', 'BARRACKS', 'BARRAGE', 'BARREL', 'BARREN', 'BARRETTE', 'BARRICADE', 'BARRIER', 'BARRING', 'BARRIO', 'BARRISTER', 'BARROOM', 'BARROW', 'BARTENDER', 'BARTER', 'BASALT', 'BASE', 'BASEBALL', 'BASEBOARD', 'BASELESS', 'BASELINE', 'BASEMENT', 'BASENESS', 'BASES', 'BASH', 'BASHFUL', 'BASHFULNESS', 'BASIC', 'BASICALLY', 'BASICS', 'BASIL', 'BASILICA', 'BASIN', 'BASIS', 'BASK', 'BASKET', 'BASKETBALL', 'BASQUE', 'BASS', 'BASSIST', 'BASSOON', 'BAST', 'BASTARD', 'BASTE', 'BASTINADO', 'BASTION', 'BAT', 'BATCH', 'BATED', 'BATH', 'BATHE', 'BATHER', 'BATHHOUSE', 'BATHING', 'BATHOS', 'BATHROBE', 'BATHROOM', 'BATHTUB', 'BATIK', 'BATING', 'BATMAN', 'BATTALION', 'BATTEN', 'BATTER', 'BATTERY', 'BATTING', 'BATTLE', 'BATTLEAX', 'BATTLEFIELD', 'BATTLEMENT', 'BATTLESHIP', 'BATTY', 'BAUBLE', 'BAUD', 'BAWDINESS', 'BAWDY', 'BAWL', 'BAY', 'BAYONET', 'BAYOU', 'BAZAAR', 'BAZOOKA', 'BEACH', 'BEACON', 'BEAD', 'BEADED', 'BEADING', 'BEADLE', 'BEADY', 'BEAGLE', 'BEAK', 'BEAKER', 'BEAM', 'BEAN', 'BEANPOLE', 'BEAR', 'BEARABLE', 'BEARD', 'BEARDED', 'BEARER', 'BEARISH', 'BEARING', 'BEAST', 'BEASTLY', 'BEAT', 'BEATEN', 'BEATER', 'BEATIFIC', 'BEATIFICATION', 'BEATIFY', 'BEATING', 'BEATITUDE', 'BEATNIK', 'BEAU', 'BEAUMONT', 'BEAUTEOUS', 'BEAUTICIAN', 'BEAUTIFUL', 'BEAUTIFULLY', 'BEAUTIFY', 'BEAUTY', 'BEAVER', 'BECAUSE', 'BECK', 'BECKON', 'BECOME', 'BECOMING', 'BED', 'BEDAUB', 'BEDAZZLE', 'BEDDED', 'BEDDING', 'BEDECK', 'BEDEVIL', 'BEDEW', 'BEDFELLOW', 'BEDFAST', 'BEDROOM', 'BEDROCK', 'BEDSIDE', 'BEDSIT', 'BEDSORE', 'BEDSPREAD', 'BEDSPRING', 'BEDSTEAD', 'BEDTIME', 'BEDUCK', 'BEDUIN', 'BED', 'BEHEAD', 'BEHEADED', 'BEHEADING', 'BEHEMOTH', 'BEHEST', 'BEHIND', 'BEHINDS', 'BEHOLD', 'BEHOLDER', 'BEHOLDEN', 'BEHOLD', 'BEHOOF', 'BEHOOVE', 'BEHALF', 'BEHAVE', 'BEHAVED', 'BEHAVES', 'BEHAVING', 'BEHAVIOR', 'BEHAVIORAL', 'BEHAVIORISM', 'BEHAVIORIST', 'BEHAVIORS', 'BEHAVIOUR', 'BEHAVIOURAL', 'BEHAVIOURISM', 'BEHAVIOURIST', 'BEHAVIOURS', 'BELABOR', 'BELABORED', 'BELACE', 'BELACED', 'BELADIED', 'BELADY', 'BELADS', 'BELAFTER', 'BELAGGED', 'BELAG', 'BELAID', 'BELAIN', 'BELAIR', 'BELAIRS', 'BELAIRS', 'BELAITS', 'BELAKCE', 'BELAKCED', 'BELAKCES', 'BELAKCING', 'BELALLY', 'BELAM', 'BELAME', 'BELAMIED', 'BELAMIES', 'BELAMINGS', 'BELAMINGS', 'BELAMINGLY', 'BELAMINGS', 'BELAMINGS', 'BELAMINGLY', 'BELAMYS', 'BELAMYS', 'BELAMS', 'BELAMS', 'BELAMS', 'BELAMY', 'BELAMS', 'BELAMY', 'BELAMYS', 'BELAMYS', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMYS', 'BELAMYS', 'BELAMYS', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMYS', 'BELAMYS', 'BELAMY', 'BELAMY', 'BELAMYS', 'BELAMYS', 'BELAMY', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMYS', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY', 'BELAMY']);
 
 function pickWord(len, customList) {
   const source = (customList && customList.length > 0) ? customList : WORDS;
@@ -1016,7 +1019,12 @@ function renderRound(data) {
     remaining--;
     tEl.textContent = remaining;
     tEl.className = 't-num' + (remaining <= 10 ? ' urgent' : '');
-    if (remaining <= 0) { clearInterval(timerInterval); if (isHost) endRound(); }
+    if (remaining <= 0) { 
+      clearInterval(timerInterval);
+      roundEndTime = Date.now();
+      if (apiAbortController) apiAbortController.abort();
+      if (isHost) endRound();
+    }
   }, 1000);
 }
 
@@ -1026,37 +1034,65 @@ function renderFeed(subs, roundOver) {
   const entries = Object.entries(subs);
   if (entries.length === 0) return;
   if (roundOver) {
-    // Show all after round ends
-    Object.values(subs).sort((a,b) => b.pts - a.pts).forEach(s => {
+    // Show all after round ends sorted by points
+    Object.values(subs).sort((a,b) => b.pts !== a.pts ? (b.pts - a.pts) : (a.time - b.time)).forEach(s => {
       const div = document.createElement('div');
       div.className = 'feed-item';
       div.innerHTML = `<span class="fi-word">${s.word}</span><span class="fi-name">${s.name}</span><span class="fi-pts">+${s.pts}</span>`;
       list.appendChild(div);
     });
   } else {
-    // During round: show answered count but not words
-    const answeredCount = entries.length;
-    const div = document.createElement('div');
-    div.className = 'feed-item';
-    div.innerHTML = `<span class="fi-name" style="color:var(--accent)">✓ ${answeredCount} player${answeredCount!==1?'s':''} answered — words hidden until round ends</span>`;
-    list.appendChild(div);
-    // Show own answer if submitted
-    const myEntry = Object.values(subs).find(s => s.name === myName);
-    if (myEntry) {
-      const myDiv = document.createElement('div');
-      myDiv.className = 'feed-item';
-      myDiv.innerHTML = `<span class="fi-word">${myEntry.word}</span><span class="fi-name">You</span><span class="fi-pts">+${myEntry.pts}</span>`;
-      list.appendChild(myDiv);
-    }
+    // During round: show names of who answered in order
+    const answeredList = Object.values(subs).sort((a,b) => a.time - b.time);
+    const answeredCount = answeredList.length;
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'feed-item';
+    headerDiv.innerHTML = `<span class="fi-name" style="color:var(--accent)">✓ ${answeredCount} answered</span>`;
+    list.appendChild(headerDiv);
+    answeredList.forEach((s, idx) => {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      const isMe = s.name === myName;
+      div.innerHTML = `<span class="fi-word">${idx + 1}.</span><span class="fi-name" style="${isMe ? 'color:var(--green)' : ''}">${isMe ? 'You' : s.name}</span>`;
+      list.appendChild(div);
+    });
   }
 }
 
 async function isRealWord(word) {
+  // Validate against Wiktionary API
   try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`);
-    return res.ok;
-  } catch(e) {
-    return true; // if API fails, allow word
+    // Create abort controller for timeout (8 seconds max)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    // Query Wiktionary API for English words
+    const response = await fetch(
+      `https://en.wiktionary.org/w/api.php?action=query&titles=${encodeURIComponent(word.toLowerCase())}&format=json&origin=*`,
+      { signal: controller.signal }
+    );
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      // Network error - reject word to prevent cheating
+      return false;
+    }
+    
+    const data = await response.json();
+    if (!data.query || !data.query.pages) {
+      return false; // Invalid response
+    }
+    
+    // Check if word exists in Wiktionary (not marked as missing)
+    const pages = Object.values(data.query.pages);
+    const wordExists = pages.some(page => page.ns === 0 && !page.missing);
+    
+    return wordExists;
+    
+  } catch(error) {
+    // Timeout or other error - REJECT to prevent accepting invalid words
+    return false;
   }
 }
 
@@ -1090,7 +1126,7 @@ window.submitWord = async function() {
     const valid = await isRealWord(val);
     input.disabled = false;
     if (!valid) {
-      errorEl.textContent = `"${val}" is not a recognised word — try again!`;
+      errorEl.textContent = `Not a real word, try again!`;
       input.classList.add('shake'); setTimeout(() => input.classList.remove('shake'), 400);
       input.value = '';
       return;
